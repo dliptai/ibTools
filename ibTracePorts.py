@@ -12,226 +12,242 @@ import sys
 import socket
 import os
 
-ibDirDefault = '/root/ib'
-startHost='xepbs'
-startHost='vu-pbs'
-startHost='r-pbs'
-startHost='r-pbs HCA-1'
-startHost='hpc-mgmt HCA-1'
-startHost='sorenson HCA-1'
+ibDirDefault = "/root/ib"
+startHost = "xepbs"
+startHost = "vu-pbs"
+startHost = "r-pbs"
+startHost = "r-pbs HCA-1"
+startHost = "hpc-mgmt HCA-1"
+startHost = "sorenson HCA-1"
 
 # if all switches are un-named then use a 2 pass approach and serial numbers for switches instead of names
-unnamed=1
+unnamed = 1
 
 # allow multiple ports on the same fabric
 # NOTE - with this =0, you can still have one port on a fabric but it's port #2 of a card.
 #        it's only if you have both port1,port2 on the same fabric that you need this.
-allowMultiPort=0
+allowMultiPort = 0
 
-def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
-   f = ibNetFile
-   d = ibDir
-   if d == None:
-      d = ibDirDefault
-   if f == None:
-      suffix = 'ibnetdiscover'
-      f, fTime = findMostRecentFile( d, suffix )
-   print('using', f, 'in dir', d)
-   f = d + '/' + f
-   lines = open( f, 'r' ).readlines()
-   #print lines
 
-   # ...
-   # Switch  36 "S-0021283a8836a0a0"         # "0x0021283a8836a0a0 M2-1" enhanced port 0 lid 1678 lmc 0
-   # [36]    "H-00212800013e555a"[1](212800013e555b)                 # "marmot1 HCA-1" lid 91 4xQDR
-   # [35]    "S-0021283a89e015d2"[34]                # "0x0021283a89e015d2 M9-3-LC-5d" lid 520 4xQDR
-   # [34]    "H-00212800013e5822"[1](212800013e5823)                 # "marmot3 HCA-1" lid 32 4xQDR
-   # [33]    "S-0021283a89e015d2"[33]                # "0x0021283a89e015d2 M9-3-LC-5d" lid 520 4xQDR
-   # ...
+def parseIbnetdiscover(ibDir=None, ibNetFile=None):
+    f = ibNetFile
+    d = ibDir
+    if d == None:
+        d = ibDirDefault
+    if f == None:
+        suffix = "ibnetdiscover"
+        f, fTime = findMostRecentFile(d, suffix)
+    print("using", f, "in dir", d)
+    f = d + "/" + f
+    lines = open(f, "r").readlines()
+    # print lines
 
-   # ...
-   # Ca      2 "H-00212800013e60f6"          # "marmot2 HCA-1"
-   # [1](212800013e60f7)     "S-0021283a842110d2"[28]                # lid 241 lmc 0 "Sun DCS 648 QDR LC switch 1.6" lid 211 4xQDR
-   # [2](212800013e60f8)     "S-0021283a842110d2"[29]                # lid 256 lmc 0 "Sun DCS 648 QDR LC switch 1.6" lid 211 4xQDR
+    # ...
+    # Switch  36 "S-0021283a8836a0a0"         # "0x0021283a8836a0a0 M2-1" enhanced port 0 lid 1678 lmc 0
+    # [36]    "H-00212800013e555a"[1](212800013e555b)                 # "marmot1 HCA-1" lid 91 4xQDR
+    # [35]    "S-0021283a89e015d2"[34]                # "0x0021283a89e015d2 M9-3-LC-5d" lid 520 4xQDR
+    # [34]    "H-00212800013e5822"[1](212800013e5823)                 # "marmot3 HCA-1" lid 32 4xQDR
+    # [33]    "S-0021283a89e015d2"[33]                # "0x0021283a89e015d2 M9-3-LC-5d" lid 520 4xQDR
+    # ...
 
-   swSerials = {}
-   if unnamed:
-      for l in lines:
-         if l[:6] == 'Switch':
+    # ...
+    # Ca      2 "H-00212800013e60f6"          # "marmot2 HCA-1"
+    # [1](212800013e60f7)     "S-0021283a842110d2"[28]                # lid 241 lmc 0 "Sun DCS 648 QDR LC switch 1.6" lid 211 4xQDR
+    # [2](212800013e60f8)     "S-0021283a842110d2"[29]                # lid 256 lmc 0 "Sun DCS 648 QDR LC switch 1.6" lid 211 4xQDR
+
+    swSerials = {}
+    if unnamed:
+        for l in lines:
+            if l[:6] == "Switch":
+                s = l.split('"')
+                swSerial = s[1]
+                swLid = int(s[4].split()[4])
+                swSerials[swLid] = swSerial
+
+    lph = []
+    switchTree = {}
+    byName = {}
+    rates = {}
+    d = None
+    next = 0
+    for l in lines:
+        # print 'l', l
+        if next == "ca":
             s = l.split('"')
-            swSerial = s[1]
-            swLid = int(s[4].split()[4])
-            swSerials[swLid] = swSerial
-
-   lph = []
-   switchTree = {}
-   byName = {}
-   rates = {}
-   d = None
-   next = 0
-   for l in lines:
-      #print 'l', l
-      if next == 'ca':
-         s = l.split('"')
-         if len(s) < 2:
-            # ran out of ports on this HCA
-            next = 0
-            continue
-         swlid = int(l.split()[-2])
-         swport = int(l.split('[')[2].split(']')[0])
-         lid = int(l.split('#')[1].split()[1])
-         port = int(l.split(']')[0].split('[')[1])
-         h = host
-         if allowMultiPort:
-            if port != 1: # multi-port HCA
-               h += ' port%d' % port
-         #print 'lph appending', h
-         lph.append( ( swlid, swport, lid, port, h ) )
-         rates[(lid, port)] = l.split()[-1]
-         next = 'ca' # goto next port on this HCA
-      elif l[:2] == 'Ca':
-         host = l.split('"')[3]
-         h = host.split()
-         if len(h) == 0 or h[0] == '@':  # unnamed can be eg. '@ HCA-1'
-            #print 'skipping unnamed node', l,
-            next = 0
-            continue
-         #print host
-         next = 'ca'
-      elif l[:6] == 'Switch':
-         s = l.split('"')
-         swLid = int(s[4].split()[4])
-         if unnamed:
-            swName = swSerials[swLid]
-         else:
-            if len(s[3].split()) > 1:
-               swName = s[3].split()[1]
-            else:
-               swName = s[3]
-         if swName == '' or swName == '-':
-            print('error. unnamed switch chip', s)
-         #print 'switch', 'l', l, 's', s, 's[3]', s[3], 'swName', swName
-         #print 'sw', swName, 'lid', swLid
-         d = {}
-         next = 'ports'
-      elif next == 'ports':
-         s = l.split('"')
-         if len(s) < 2:
-            next = 0
-            switchTree[swLid] = [ swName, swLid, d ]
-            continue
-         # down this switch port number...
-         port = int(s[0].split(']')[0][1:])
-         # ... we have this lid for a host/switch
-         lid = int(s[4].split()[1])
-         # ... which talks to us on this port
-         remPort = int(s[2].split(']')[0][1:])
-         t = s[1][0]
-         if t == 'H':    # host at the end of this port
-            name = s[3]
+            if len(s) < 2:
+                # ran out of ports on this HCA
+                next = 0
+                continue
+            swlid = int(l.split()[-2])
+            swport = int(l.split("[")[2].split("]")[0])
+            lid = int(l.split("#")[1].split()[1])
+            port = int(l.split("]")[0].split("[")[1])
+            h = host
             if allowMultiPort:
-               if remPort != 1:  # found a multi-port HCA. append the port number to the name
-                  name += ' port%d' % remPort
-         elif t == 'S':  # switch  ""
+                if port != 1:  # multi-port HCA
+                    h += " port%d" % port
+            # print 'lph appending', h
+            lph.append((swlid, swport, lid, port, h))
+            rates[(lid, port)] = l.split()[-1]
+            next = "ca"  # goto next port on this HCA
+        elif l[:2] == "Ca":
+            host = l.split('"')[3]
+            h = host.split()
+            if len(h) == 0 or h[0] == "@":  # unnamed can be eg. '@ HCA-1'
+                # print 'skipping unnamed node', l,
+                next = 0
+                continue
+            # print host
+            next = "ca"
+        elif l[:6] == "Switch":
+            s = l.split('"')
+            swLid = int(s[4].split()[4])
             if unnamed:
-               name = swSerials[lid]
+                swName = swSerials[swLid]
             else:
-               if len(s[3].split()) > 1:
-                  name = s[3].split()[1]
-               else:
-                  name = s[3]
-         else:
-            print('unknown type of link from switch. line is', l)
-            continue
-         d[port] = [ name, lid, remPort ]
-         if t == 'H':
-            byName[name] = [ port, swName, swLid ]
-         #print 'port', port, 't', t, 'lid', lid, 'name', name
-         rates[(swLid, port)] = l.split()[-1]
+                if len(s[3].split()) > 1:
+                    swName = s[3].split()[1]
+                else:
+                    swName = s[3]
+            if swName == "" or swName == "-":
+                print("error. unnamed switch chip", s)
+            # print 'switch', 'l', l, 's', s, 's[3]', s[3], 'swName', swName
+            # print 'sw', swName, 'lid', swLid
+            d = {}
+            next = "ports"
+        elif next == "ports":
+            s = l.split('"')
+            if len(s) < 2:
+                next = 0
+                switchTree[swLid] = [swName, swLid, d]
+                continue
+            # down this switch port number...
+            port = int(s[0].split("]")[0][1:])
+            # ... we have this lid for a host/switch
+            lid = int(s[4].split()[1])
+            # ... which talks to us on this port
+            remPort = int(s[2].split("]")[0][1:])
+            t = s[1][0]
+            if t == "H":  # host at the end of this port
+                name = s[3]
+                if allowMultiPort:
+                    if (
+                        remPort != 1
+                    ):  # found a multi-port HCA. append the port number to the name
+                        name += " port%d" % remPort
+            elif t == "S":  # switch  ""
+                if unnamed:
+                    name = swSerials[lid]
+                else:
+                    if len(s[3].split()) > 1:
+                        name = s[3].split()[1]
+                    else:
+                        name = s[3]
+            else:
+                print("unknown type of link from switch. line is", l)
+                continue
+            d[port] = [name, lid, remPort]
+            if t == "H":
+                byName[name] = [port, swName, swLid]
+            # print 'port', port, 't', t, 'lid', lid, 'name', name
+            rates[(swLid, port)] = l.split()[-1]
 
-   return switchTree, byName, lph, rates
+    return switchTree, byName, lph, rates
 
 
-def findMostRecentFile( d, suffix ):
-   l, lt, lp, ltp = findMostRecentFiles( d, suffix )
-   return l, lt
+def findMostRecentFile(d, suffix):
+    l, lt, lp, ltp = findMostRecentFiles(d, suffix)
+    return l, lt
 
-def findMostRecentFiles( d, suffix ):
-   files = os.listdir( d )
-   last = None
-   lastTime = 0
-   lastPrev = None
-   lastTimePrev = 0
-   for f in files:
-      if f.split('.')[-1] == suffix:
-         m = os.path.getmtime( d + '/' + f)
-         if m > lastTime:
-            lastPrev = last
-            lastTimePrev = lastTime
-            last = f
-            lastTime = m
-         elif m > lastTimePrev:
-            lastPrev = f
-            lastTimePrev = m
 
-   return last, lastTime, lastPrev, lastTimePrev
+def findMostRecentFiles(d, suffix):
+    files = os.listdir(d)
+    last = None
+    lastTime = 0
+    lastPrev = None
+    lastTimePrev = 0
+    for f in files:
+        if f.split(".")[-1] == suffix:
+            m = os.path.getmtime(d + "/" + f)
+            if m > lastTime:
+                lastPrev = last
+                lastTimePrev = lastTime
+                last = f
+                lastTime = m
+            elif m > lastTimePrev:
+                lastPrev = f
+                lastTimePrev = m
 
-if __name__ == '__main__':
+    return last, lastTime, lastPrev, lastTimePrev
 
-   ibNetFile = None
-   if len(sys.argv) == 3:
-      ibNetFile = sys.argv[2]
-      path = sys.argv[1]
-   elif len(sys.argv) == 2:
-      path = sys.argv[1]
-   else:
-      print('usage', sys.argv[0], '<path> [ibnetdiscover file]')
-      print('eg.', sys.argv[0], '0,1,31,18,33,31,27  /root/ib/2010-04-07-15:02:29.ibnetdiscover')
-      sys.exit(1)
 
-   switchTree, byName, lph, r = parseIbnetdiscover(ibNetFile=ibNetFile)
-   #print 'switchTree (len', len(switchTree), ')', switchTree
-   #print 'byName (len', len(byName), ')', byName
+if __name__ == "__main__":
 
-   name = socket.gethostname()
-   if name != startHost:
-      print('WARNING - the port trace is assumed to be relative to', startHost, 'not this host', name)
-      #sys.exit(1)
-      name = startHost
-   start = byName[name]
-   port, swName, swLid = start
-   print('start at', name, 'lid', swLid, 'attached to switch', swName, 'port', port)
-   loc = swLid
+    ibNetFile = None
+    if len(sys.argv) == 3:
+        ibNetFile = sys.argv[2]
+        path = sys.argv[1]
+    elif len(sys.argv) == 2:
+        path = sys.argv[1]
+    else:
+        print("usage", sys.argv[0], "<path> [ibnetdiscover file]")
+        print(
+            "eg.",
+            sys.argv[0],
+            "0,1,31,18,33,31,27  /root/ib/2010-04-07-15:02:29.ibnetdiscover",
+        )
+        sys.exit(1)
 
-   # eg.  1,31,1,33,33    <- a dead link
-   # or
-   # 0,1,31,18,33,31,27  -> host == v1224
-   #    0,1 is out of vupbs
-   #    31 port out of qnem
-   #    18 port out of LC
-   #    33         FC
-   #    31         LC
-   #    27         qnem
+    switchTree, byName, lph, r = parseIbnetdiscover(ibNetFile=ibNetFile)
+    # print 'switchTree (len', len(switchTree), ')', switchTree
+    # print 'byName (len', len(byName), ')', byName
 
-   # pull off initial '0,' if there is one
-   if path[:2] == '0,':
-      path = path[2:]
-   print('path', path)
+    name = socket.gethostname()
+    if name != startHost:
+        print(
+            "WARNING - the port trace is assumed to be relative to",
+            startHost,
+            "not this host",
+            name,
+        )
+        # sys.exit(1)
+        name = startHost
+    start = byName[name]
+    port, swName, swLid = start
+    print("start at", name, "lid", swLid, "attached to switch", swName, "port", port)
+    loc = swLid
 
-   if path[:2] != '1,':
-      print('we assume path always starts with "1,". need to fix this script if you want something else.')
-      sys.exit(1)
-   else:
-      path = path[2:]
+    # eg.  1,31,1,33,33    <- a dead link
+    # or
+    # 0,1,31,18,33,31,27  -> host == v1224
+    #    0,1 is out of vupbs
+    #    31 port out of qnem
+    #    18 port out of LC
+    #    33         FC
+    #    31         LC
+    #    27         qnem
 
-   name = swName
-   path = path.split(',')
-   for p in path:
-      p = int(p)
-      swName, swLid, d = switchTree[loc]
-      nextHop = d[p]
-      #print 'nextHop', nextHop
-      name, loc, remPort = nextHop
-      print('... travelling to port', p, '(%s, lid %d)' % ( name, loc ))
+    # pull off initial '0,' if there is one
+    if path[:2] == "0,":
+        path = path[2:]
+    print("path", path)
 
-   print('destination', name, 'lid', loc, 'port', remPort)
+    if path[:2] != "1,":
+        print(
+            'we assume path always starts with "1,". need to fix this script if you want something else.'
+        )
+        sys.exit(1)
+    else:
+        path = path[2:]
+
+    name = swName
+    path = path.split(",")
+    for p in path:
+        p = int(p)
+        swName, swLid, d = switchTree[loc]
+        nextHop = d[p]
+        # print 'nextHop', nextHop
+        name, loc, remPort = nextHop
+        print("... travelling to port", p, "(%s, lid %d)" % (name, loc))
+
+    print("destination", name, "lid", loc, "port", remPort)
