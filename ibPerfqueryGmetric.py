@@ -23,12 +23,28 @@ import string
 import subprocess
 import socket
 import os
+import json
+import urllib2
 
-from pbsMauiGanglia import gangliaStats
+#from pbsMauiGanglia import gangliaStats
 from ibTracePorts import parseIbnetdiscover
-from bobMonitor import pbsJobsBob  # to find which jobs are on a flickering node
+#from bobMon import pbsJobs  # to find which jobs are on a flickering node
+import gmetric
+
+dir='/root/ib/'
+perfCmd=dir + 'perfqueryMany'
+
+gmondFormat = 'collectl'  # use collectl style names for metrics
+gmondFormat = 'classic'
+
+gmondHost = '10.8.48.11'
+gmondPort = 8649
+gmondProtocol = 'udp'   # 'multicast'
+
+debug=0
 
 # only gather from nodes that we've heard from in the last 'aliveTime' seconds
+gmond_lastReported='http://transom1.hpc.sut/bobMon/gmond_lastReported.json'
 aliveTime = 120
 
 # sleep this many seconds between samples
@@ -40,8 +56,8 @@ sleepTime = 15
 hostMode = 'host'
 
 # limit insane data
-dataMax = 4*1024*1024*1024   # 4GB/s
-pktsMax = 10*1024*1024  # 3 M pkts/s is too low, try 10
+dataMax = 40*1024*1024*1024   # 40GB/s
+pktsMax = 50*1024*1024  # 3 M pkts/s is too low, try 10, try 50
 
 # unreliable hosts
 unreliable = []
@@ -61,6 +77,68 @@ unreliable.append( "gopher4" )
 unreliable.append( "roffle" )
 unreliable.append( "rofflegige" )
 
+unreliable.append( "g2.hpc.swin.edu.au" )
+unreliable.append( "hpc-mgmt-ipmi.hpc.swin.edu.au" )
+unreliable.append( "hpc-mgmt" )
+unreliable.append( "mds1.hpc.swin.edu.au" )
+unreliable.append( "mds2.hpc.swin.edu.au" )
+unreliable.append( "QLogic" ) # some un-named 1/2 up node?
+
+unreliable.append( "ldap1.hpc.swin.edu.au" )
+unreliable.append( "ldap2.hpc.swin.edu.au" )
+
+# collectl does ib on oss/mds
+unreliable.append( "metadata01" )
+unreliable.append( "metadata02" )
+for f in range(1,13):
+   unreliable.append( "object%.2d" % f )
+## and on tapeserv01
+#unreliable.append( "tapeserv01" )
+
+# on gige but not IB
+unreliable.append( "rsldap1" )
+unreliable.append( "rsldap2" )
+unreliable.append( "data-mover01" )
+unreliable.append( "data-mover02" )
+unreliable.append( "gbkfit.hpc.swin.edu.au" )
+unreliable.append( "gbkfit" )
+
+# ignore compute. we just gather for storage
+for f in range(1,3):
+   unreliable.append( "transom%d" % f )
+   unreliable.append( "farnarkle%d" % f )
+   unreliable.append( "riley%d" % f )
+for f in range(1,201):
+   unreliable.append( "john%d" % f )
+for f in range(1,21):
+   unreliable.append( "bryan%d" % f )
+for f in range(1,330):
+   unreliable.append( "gina%d" % f )
+   unreliable.append( "dave%d" % f )
+   unreliable.append( "data-mover%.2d" % f )
+for f in range(1,205):
+   unreliable.append( "gstar%.3d" % f )
+for f in range(1,302):
+   unreliable.append( "sstar%.3d" % f )
+for f in range(1,21):
+   unreliable.append( "clarke%d" % f )
+unreliable.append( "pbs" )
+unreliable.append( "hpc-mgmt" )
+unreliable.append( "sstar" )
+unreliable.append( "gstar" )
+unreliable.append( "phlange" )
+unreliable.append( "tapeserv01" )
+unreliable.append( "trevor" )
+for f in range(1,101):
+   unreliable.append( "trevor%d" % f )
+## ignore mlx side of lnet's too?
+#for f in range(1,21):
+#   unreliable.append( "lnet%.2d" % f )
+# ignore beer for now
+#unreliable.append( "metadata101" )
+#unreliable.append( "object101" )
+#unreliable.append( "object102" )
+
 ## router nodes
 #useAnyway = [ 'knet00', 'knet01' ]
 
@@ -72,15 +150,17 @@ def findUpDown(all, timeout):
     up = []
     down = []
     for host in all.keys():
-        if now - all[host]['reported'] < timeout:
+        #if now - all[host]['reported'] < timeout:
+        if now - all[host] < timeout:
              up.append(host)
         else:
              down.append(host)
     return up, down
 
 def listOfUpHosts(deadTimeout):
-    g = gangliaStats( reportTimeOnly=1 )
-    all = g.getAll()
+    #g = gangliaStats( reportTimeOnly=1 )
+    #all = g.getAll()
+    all = json.load(urllib2.urlopen(gmond_lastReported))
 
     up, down = findUpDown(all, deadTimeout)
     up.sort()
@@ -92,6 +172,7 @@ def listOfUpHosts(deadTimeout):
         if u in up:
             #print 'deleting unreliable', u
             up.remove(u)
+    #print 'up', up
     #sys.exit(1)
 
     return up
@@ -108,15 +189,15 @@ def getIp(host):
    try:
       ip = ipCache[host]
    except:
-      #print 'host', host, 'not in ipCache'
+      print 'host', host, 'not in ipCache'
       ip = socket.gethostbyname(host)
       ipCache[host] = ip
    return ip
 
 def compareIbToGanglia( lidPortHost, up ):
    ibHosts = []
-   for swl,swp,l,h in lidPortHost:
-      ibHosts.append(h)
+   for swl,swp,l,p,h in lidPortHost:
+      ibHosts.append(h.split()[0])   # stip off the HCA-* or whatever
    newlyDown = []
    for h in ibHosts:
       #if h in useAnyway:  # assume always up, even if not seen anywhere else
@@ -133,24 +214,24 @@ def compareIbToGanglia( lidPortHost, up ):
             crashedOs.remove(h)
             sys.stderr.write( sys.argv[0] + ': Info: ' + h + ' in ib. was out of ganglia, but now back up\n' )
 
-   #newlyDown = [ "v1205", "v1206" ]
-   # check for multiple down nodes running the same job
-   if len(newlyDown):
-      p = pbsJobsBob()
-      jobs = p.getJobList()
-      j = {}
-      for h in newlyDown:
-         for username, nodeList, line, tagId, timeToGo, jobId, jobName, pbsInfo in jobs:  # append to joblist field
-            if h in nodeList:
-               if 'state' in pbsInfo.keys() and pbsInfo['state'] != 'S':
-                  k = str( ( username, line ) )
-                  if k not in j.keys():
-                     j[k] = []
-                  j[k].append(h)
-      for h in j.keys():
-         if len(j[h]) > 1: # more than 1 node of this job is down
-            sys.stderr.write( sys.argv[0] + ': Warning: job ' + str(h) + ' has multiple nodes down in ganglia ' + str(j[h]) + '\n' )
-   #sys.exit(1)
+#   #newlyDown = [ "v1205", "v1206" ]
+#   # check for multiple down nodes running the same job
+#   if len(newlyDown):
+#      p = pbsJobs()
+#      jobs = p.getJobList()
+#      j = {}
+#      for h in newlyDown:
+#         for username, nodeList, gpus, line, tagId, timeToGo, jobId, jobName, pbsInfo in jobs:  # append to joblist field
+#            if h in nodeList:
+#               if 'state' in pbsInfo.keys() and pbsInfo['state'] != 'S':
+#                  k = str( ( username, line ) )
+#                  if k not in j.keys():
+#                     j[k] = []
+#                  j[k].append(h)
+#      for h in j.keys():
+#         if len(j[h]) > 1: # more than 1 node of this job is down
+#            sys.stderr.write( sys.argv[0] + ': Warning: job ' + str(h) + ' has multiple nodes down in ganglia ' + str(j[h]) + '\n' )
+#   #sys.exit(1)
 
    newhosts = 0
    for h in up:
@@ -169,7 +250,7 @@ def runIbnetdiscover():
    if len(err) != 0:
       sys.stderr.write( sys.argv[0] + ': Error: running ibnetdiscover failed\n' )
       return 1
-   fn = '/root/ib/' + time.strftime('%Y-%m-%d-%H:%M:%S' ) + '.ibnetdiscover'
+   fn = dir + time.strftime('%Y-%m-%d-%H:%M:%S' ) + '.ibnetdiscover'
    try:
       f = open(fn, 'w')
    except:
@@ -185,12 +266,12 @@ def runIbnetdiscover():
    return 0
 
 def buildIbCmd( lidPortHost, up ):
-   lp = '/opt/root/perfqueryMany'
+   lp = perfCmd
    cnt = 0
-   for swl,swp,l,h in lidPortHost:
-      if h in up:   # only gather for up hosts
+   for swl,swp,l,p,h in lidPortHost:
+      if h.split()[0] in up:   # only gather for up hosts
          if hostMode == 'host':
-            lp += ' %d %d' % ( l, 1 )
+            lp += ' %d %d' % ( l, p )
          else:
             lp += ' %d %d' % ( swl, swp )
          cnt += 1
@@ -245,7 +326,10 @@ def parseToStats( r, lidPortHost, up ):
          # check it's the next lid/port we're expecting
          h = ''
          while h not in up:
-            swlid, swport, lid, h = lidPortHost[upTo]
+            swlid, swport, lid, port, h = lidPortHost[upTo]
+            h = h.split()[0]
+            #if h not in up:
+            #   print 'skipping', h
             upTo += 1
          ii = i.split(':')[1]
          ii = ii.split()
@@ -255,9 +339,9 @@ def parseToStats( r, lidPortHost, up ):
                sys.stderr.write( sys.argv[0] + ': Error: host ' + h + ': expected switch lid/port %d/%d' % ( swlid, swport ) + ' not ' + i + '. Supressing further errors\n' )
             errCnt += 1
             continue
-         elif hostMode == 'host' and ( int(ii[1]) != lid or int(ii[3]) != 1 ):
+         elif hostMode == 'host' and ( int(ii[1]) != lid or int(ii[3]) != port ):
             if errCnt < 1:
-               sys.stderr.write( sys.argv[0] + ': Error: host ' + h +': expected host lid/port %d/%d' % ( lid, 1 ) + ' not ' + i + '. Supressing further errors\n' )
+               sys.stderr.write( sys.argv[0] + ': Error: host ' + h +': expected host lid/port %d/%d' % ( lid, port ) + ' not ' + i + '. Supressing further errors\n' )
             errCnt += 1
             continue
          reading = 1
@@ -278,6 +362,15 @@ def parseToStats( r, lidPortHost, up ):
             val = ii[1].strip('.')
             #print h, ii[0], val
             d.append( int(val) )
+
+   # the last hosts might need to be skipped too
+   h = ''
+   while h not in up and upTo < len(lidPortHost):
+      swlid, swport, lid, port, h = lidPortHost[upTo]
+      h = h.split()[0]
+      #if h not in up:
+      #   print 'skipping', h
+      upTo += 1
 
    if upTo != len(lidPortHost):
       sys.stderr.write( sys.argv[0] + ': Error: expected %d responses and got %d. ErrCnt %d\n' % (len(lidPortHost), upTo, errCnt ) )
@@ -308,9 +401,8 @@ def computeRates( sOld, s ):
             rates[h] = r
    return rates
 
-def parseValsToGmetricLines(rates, up):
+def ratesToGmetric(gm, rates, up):
    rateKeys = rates.keys()
-   c = []
 
    weirdCnt = 0
    weirdThresh = 5
@@ -362,13 +454,22 @@ def parseValsToGmetricLines(rates, up):
       if weirdCnt >= weirdThresh:
          print 'trapped many weird pkts/data - cnt', weirdCnt
 
-      c.append( '/usr/bin/gmetric -S ' + spoofStr + ' -t float -n "ib_bytes_out" -u "bytes/sec"   -v %.2f\n' % txData )
-      c.append( '/usr/bin/gmetric -S ' + spoofStr + ' -t float -n "ib_bytes_in"  -u "bytes/sec"   -v %.2f\n' % rxData )
-      c.append( '/usr/bin/gmetric -S ' + spoofStr + ' -t float -n "ib_pkts_out"  -u "packets/sec" -v %.2f\n' % txPkts )
-      c.append( '/usr/bin/gmetric -S ' + spoofStr + ' -t float -n "ib_pkts_in"   -u "packets/sec" -v %.2f\n' % rxPkts )
-
-   return c
-
+      if gmondFormat == 'collectl':
+         gm.send( 'iconnect.kbout',  '%.2f' % (txData/1024.0), 'double', 'kb/sec',      'both', 60, 0, 'infiniband', spoofStr )
+         gm.send( 'iconnect.kbin',   '%.2f' % (rxData/1024.0), 'double', 'kb/sec',      'both', 60, 0, 'infiniband', spoofStr )
+         gm.send( 'iconnect.pktout', '%.2f' % txPkts,          'double', 'packets/sec', 'both', 60, 0, 'infiniband', spoofStr )
+         gm.send( 'iconnect.pktin',  '%.2f' % rxPkts,          'double', 'packets/sec', 'both', 60, 0, 'infiniband', spoofStr )
+      else:
+         if debug:
+           print 'gm.send( sorenson_ib_bytes_out, %.2f' % txData, 'double, kb/sec,      both, 60, 0, infiniband', spoofStr, ')'
+           print 'gm.send( sorenson_ib_bytes_in,  %.2f' % rxData, 'double, kb/sec,      both, 60, 0, infiniband', spoofStr, ')'
+           print 'gm.send( sorenson_ib_pkts_out,  %.2f' % txPkts, 'double, packets/sec, both, 60, 0, infiniband', spoofStr, ')'
+           print 'gm.send( sorenson_ib_pkts_in,   %.2f' % rxPkts, 'double, packets/sec, both, 60, 0, infiniband', spoofStr, ')'
+         else:
+           gm.send( 'sorenson_ib_bytes_out', '%.2f' % txData, 'double', 'kb/sec',      'both', 60, 0, 'infiniband', spoofStr )
+           gm.send( 'sorenson_ib_bytes_in',  '%.2f' % rxData, 'double', 'kb/sec',      'both', 60, 0, 'infiniband', spoofStr )
+           gm.send( 'sorenson_ib_pkts_out',  '%.2f' % txPkts, 'double', 'packets/sec', 'both', 60, 0, 'infiniband', spoofStr )
+           gm.send( 'sorenson_ib_pkts_in',   '%.2f' % rxPkts, 'double', 'packets/sec', 'both', 60, 0, 'infiniband', spoofStr )
 
 def parseArgs():
    global hostMode
@@ -389,10 +490,13 @@ if __name__ == '__main__':
 
    parseArgs()
 
+   gm = gmetric.Gmetric( gmondHost, gmondPort, gmondProtocol )
+
    blah, blah, lidPortHost, blah = parseIbnetdiscover()
-   #print lidPortHost, len(lidPortHost)
+   #print 'lidPortHost,', lidPortHost, 'len(lidPortHost)', len(lidPortHost)
 
    sOld = {}
+   netdiscoverLoop = 0
    while 1:
       if not first:
          time.sleep(sleepTime)
@@ -410,57 +514,45 @@ if __name__ == '__main__':
 
       newNodesFound = compareIbToGanglia( lidPortHost, up )
       if newNodesFound:
-         fail = runIbnetdiscover()
-         if fail:
-            sys.stderr.write( sys.argv[0] + ': Error: runIbnetdiscover failed. sleeping 30s\n' )
-            time.sleep(30)
+         netdiscoverLoop += 1
+         if netdiscoverLoop in ( 1, 2, 10, 100, 1000 ):
+            print 'netdiscover loop', netdiscoverLoop
+            fail = runIbnetdiscover()
+            if fail:
+               sys.stderr.write( sys.argv[0] + ': Error: runIbnetdiscover failed. sleeping 30s\n' )
+               time.sleep(30)
+               continue
+            blah, blah, lidPortHost, blah = parseIbnetdiscover()
             continue
-         blah, blah, lidPortHost, blah = parseIbnetdiscover()
-         continue
+      else:
+         netdiscoverLoop = 0
 
       cmd, cnt = buildIbCmd( lidPortHost, up )
       #print 'cmd', cmd, 'cnt', cnt
-      #print 'up', up
+      #print 'up', up, 'len(up)', len(up)
 
       # run ibperf
       r, err = runCommand( cmd )
       r = r.split('\n')
-      #print 'r', r
+      #print 'r', r, 'len(r)', len(r)
 
       s = parseToStats( r, lidPortHost, up )
-      #print 's', s
+      #print 's', s, 'len(s)', len(s)
 
       rates = computeRates( sOld, s )
-      #print 'rates', rates
+      #print 'rates', rates, 'len(rates)', len(rates)
       sOld = s
 
       if first:
          first = 0
          continue
 
-      c = parseValsToGmetricLines(rates, up)
-      if not len(c): # no hosts up?
-         continue
+      # debug - don't send to gmetric
+      #continue
+      #up = [ 'gstar001' ]
+      #print 'rates[star001]', rates['gstar001']
+      #continue
 
-      # pump vals into ganglia via gmetric
-      p = subprocess.Popen( '/bin/sh', shell=False, bufsize=-1, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE )
-      for i in c:
-         p.stdin.write( i )
-      out, err = p.communicate()
-
-      # ignore gmetric's spoof info line, send the rest to stderr
-      ep = 0
-      for o in out.split('\n'):
-         i = o.split()
-         if len(i) and i[0].strip() != 'spoofName:':
-            sys.stderr.write( sys.argv[0] + ': Error: gmetric stdout:' + str(i) + '\n' )
-            ep = 1
-      if ep:
-         sys.stderr.flush()
-
-      # print err if any
-      if len(err):
-         sys.stderr.write( sys.argv[0] + ': Error: gmetric stderr: ' +  str(err) + '\n' )
-         sys.stderr.flush()
+      ratesToGmetric(gm, rates, up)
 
       #sys.exit(1)

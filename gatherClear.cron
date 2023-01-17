@@ -1,5 +1,5 @@
 #!/bin/sh
 
-cd ~/ib/
+cd /root/ib/
 ./gather cron
 ./clear

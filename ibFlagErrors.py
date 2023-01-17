@@ -33,34 +33,98 @@ GB = 1024.0*MB
 TB = 1024.0*GB
 
 ibDir = '/root/ib'
-normalErrors = ( 'SymbolErrors', 'RcvErrors', 'LinkRecovers', 'LinkDowned', 'XmtDiscards' )
-alwaysShowErrors = ( 'LinkRecovers', 'LinkDowned', 'XmtDiscards' )
+
+# include both old and new names for the counters
+symbolErrors =     ( 'SymbolErrors','SymbolErrorCounter' )
+rcvErrors =        ( 'RcvErrors','PortRcvErrors' )
+alwaysShowErrors = ( 'LinkRecovers','LinkErrorRecoveryCounter',
+                     'LinkDowned','LinkDownedCounter',
+                     'XmtDiscards','PortXmitDiscards' )
+
+normalErrors = symbolErrors + rcvErrors + alwaysShowErrors
+
+
 noUptime = 'cmm'
 minErrCount = 3
 ibSymErrThresh = 1.0e-12
 #ibRcvErrThresh = 1500*ibSymErrThresh   # for pkts
 ibRcvErrThresh = ibSymErrThresh
-errMax = { 'SymbolErrors':65535, 'RcvErrors':65535, 'LinkRecovers':255, 'LinkDowned':255 }
+errMax = { 'SymbolErrors':65535, 'SymbolErrorCounter':65535,
+           'RcvErrors':65535, 'PortRcvErrors':65535,
+           'LinkRecovers':255, 'LinkErrorRecoveryCounter':255,
+           'LinkDowned':255, 'LinkDownedCounter':255 }
 
-# qdr
-portRate = '4xQDR'
-lineRate = 40*GB*0.8   # QDR, 0.8 for data rate ~= Sun's 120 errs/hour
+# speed of links in Gbit/s
+lineRate={}
 # fdr14
-portRate = '4xFDR'
-lineRate = 56*GB*(64.0/66.0)   # FDR
+lineRate['4xFDR'] = 56*GB*(64.0/66.0)   # FDR
+lineRate['4xSDR'] = 10*GB*0.8
+lineRate['4xDDR'] = 20*GB*0.8
+lineRate['4xQDR'] = 40*GB*0.8   # QDR, 0.8 for data rate ~= Sun's 120 errs/hour
+lineRate['4xEDR'] = 100*GB*(64.0/66.0)
+lineRate['4xHDR'] = 200*GB*(64.0/66.0)
+
+defaultPortRate = '4xHDR'
 
 lowToo = 0
 symErrsByTime = 1
 debug = 0
+
+core=()
+hostPortRates = {}
+
+# add HCA-1 to error hostnames
+addSuffixes=0
 
 # generic terms are
 #   leaf == in-shelf switches closest to compute nodes
 #   lc == line card for 2nd level of fat tree in big central switches
 #   fc == fabric card for top level of fat tree   ""     ""
 
+# 2 level topology
+namingScheme='sgi'       # 2nd level = IBCORE*|QLogic 12000, leaf = qlogic*
+#topologyLevels = ( ('host<->leaf'), ('leaf<->host'), ('leaf<->LC', 'LC<->leaf') )
+# if hosts are attached directly to core switches
+topologyLevels = ( ('host<->leaf'), ('leaf<->host'), ('leaf<->LC', 'LC<->leaf'), ('LC<->host', 'host<->LC') )
+allowHostsOnCore = 1
+
+# 3 level topology, and allow leaf-leaf links too
 namingScheme='sun'       # leaf = qnem-rack#-shelf#{a,b} or M2-*, lc,fc = M9-{LC,FC}-#{a-d}
 namingScheme='mellanox'  # lc = MF0;sx6536-5a:SXX536/L05/U1, fc = MF0;sx6536-2a:SXX536/S01/U1, leaf = ib001..
+topologyLevels = ( ('host<->leaf'), ('leaf<->host'), ('leaf<->leaf'), ('leaf<->LC', 'LC<->leaf'), ('LC<->FC', 'FC<->LC') )
+allowHostsOnCore = 0
 
+# sorenson 2 level via core switch ids
+namingScheme='unnamed'  # unnamed. core = Quantum Mellanox Technologies
+topologyLevels = ( ('host<->leaf'), ('leaf<->host'), ('leaf<->core', 'core<->leaf') )
+coreSwitches = ( 'S-0c42a103006c1534', 'S-0c42a103006c1594' )
+allowHostsOnCore = 0
+# some sort of an internal host used insde mellanox switches. ignore these.
+weirdInternalHostsOnSwitches = [ 'Mellanox Technologies Aggregation Node' ]
+hostPortRates = {'arkle1 mlx5_0':'4xEDR',
+                 'arkle2 mlx5_0':'4xEDR',
+                 'arkle3 mlx5_0':'4xEDR',
+                 'arkle4 mlx5_0':'4xEDR',
+                 'arkle5 mlx5_0':'4xEDR',
+                 'arkle6 mlx5_0':'4xEDR',
+                 'arkle7 mlx5_0':'4xEDR',
+                 'arkle8 mlx5_0':'4xEDR',
+                 'arkle9 mlx5_0':'4xEDR',
+                 'arkle10 mlx5_0':'4xEDR',
+                 'umlaut1 mlx5_0':'4xEDR',
+                 'umlaut2 mlx5_0':'4xEDR',
+                 'warble1 mlx5_0':'4xEDR',
+                 'warble2 mlx5_0':'4xEDR',
+                 'lnet01 mlx4_0':'4xQDR',
+                 'lnet02 mlx4_0':'4xQDR',
+                 'object101 mlx4_0':'4xSDR',
+                 'object102 mlx4_0':'4xSDR',
+                 'metadata101 mlx4_0':'4xSDR',
+                 'sorenson HCA-1':'4xEDR',
+                 }
+# purely arbitrary names just to make them easier to read
+switchNameMap = { 'S-0c42a103006c1534':'core1', 'S-0c42a103006c1594':'core2',
+                  'S-0c42a103006c1894':'leaf1', 'S-0c42a103006c2274':'leaf2', 'S-0c42a103006c14b4':'leaf3' }
 
 # from
 #   http://www.openfabrics.org/downloads/dapl/documentation/uDAPL_ofed_testing_bkm.pdf
@@ -199,7 +263,7 @@ def findGroupsOfFiles(d):
                 continue
             print 'group[%d]' % i, groups[i]
 
-    # make a list of possible airs of groups that can be compared
+    # make a list of possible pairs of groups that can be compared
     pairs = []
     end = len(groups)
     i = -1
@@ -418,6 +482,20 @@ def lidType( n ):
             return 'leaf'
         #print 'unknown', namingScheme, 'chip name', n
         return None   # 'None' probably means a node
+    elif namingScheme == 'sgi':
+        # switch
+        if n[:6] == 'qlogic':  # leaf
+            return 'leaf'
+        elif n[:9] == 'QLogic 12' or n[:6] == 'IBCORE':  # LC
+            return 'LC'
+        return None   # 'None' probably means a node
+    elif namingScheme == 'unnamed':
+        # switch
+        if n in coreSwitches:
+            return 'core'
+        else:
+            return 'leaf'
+
     else:
         print 'unknown fabric naming scheme'
         return None
@@ -440,8 +518,10 @@ def findHostLid( hosts ):
     lids = []
     for h in hosts:
         found = 0
-        for swLid, swPort, lid, hh in lph:
-            if h == hh:
+        for swLid, swPort, lid, p, hh in lph:
+            hhh = hh.split()[0] # strip off HCA-* or similar so that we match all lids for this host
+            #print 'findHostLid', h, hh, hhh
+            if h == hhh:
                 found = 1
                 #print h, 'swLid, swPort, lid', swLid, swPort, lid
                 hl.append( (h, lid) )
@@ -516,7 +596,7 @@ def printMB( s, lid, port, oLid, oPort ):
             traffic = ( None, None )
     return traffic
 
-def addSymErrRateToErrs( errs, k, errorList, t ):
+def addSymErrRateToErrs( errs, k, errorList, t, expectedPortRate ):
     tx, rx = errs[k]['b']
     orx, otx = errs[k]['b-otherEnd']
 
@@ -531,13 +611,14 @@ def addSymErrRateToErrs( errs, k, errorList, t ):
         return
 
     for errName, errCnt in errorList:
-        if errName == 'SymbolErrors':
+        if errName in symbolErrors:
             if errCnt >= minErrCount:
                 plus = 0
                 if errCnt >= errMax[errName]:
                     plus = 1
                 if symErrsByTime:
-                    errs[k]['symErrRate'] = ( float(errCnt)/float(t*lineRate), src, plus )
+                    gbit = lineRate[expectedPortRate[k]]
+                    errs[k]['symErrRate'] = ( float(errCnt)/float(t*gbit), src, plus )
                 else:
                     errs[k]['symErrRate'] = ( float(errCnt)/float(rx*10), src, plus )
             else:
@@ -560,7 +641,7 @@ def addRcvErrRateToErrs( errs, k, errorList ):
         return
 
     for errName, errCnt in errorList:
-        if errName == 'RcvErrors':
+        if errName in rcvErrors:
             if errCnt >= minErrCount:
                 plus = 0
                 if errCnt >= errMax[errName]:
@@ -577,7 +658,7 @@ def addAlwaysShowErrToErrs( errs, k, errorList ):
             else:
                 errs[k]['alwaysShowErr'] = 0
 
-def addRateErrs( switchTree, lph, rates, errs ):
+def addRateErrs( switchTree, lph, rates, errs, expectedPortRate ):
     # check we have rates for all switch ports
     rk = rates.keys()
     for l in switchTree.keys():
@@ -591,32 +672,33 @@ def addRateErrs( switchTree, lph, rates, errs ):
                 errs[k]['portRate'] = 'unknown'
 
     # check we have rates for all host ports
-    for swLid, swPort, lid, hh in lph:
-        k = (lid, 1)
+    for swLid, swPort, lid, port, hh in lph:
+        k = (lid,port)
         if k not in rk:
             if k not in errs.keys():
                 errs[k] = {}
-                errs[k]['name'] = hh + ' HCA-1'
+                if addSuffixes:
+                    errs[k]['name'] = hh + ' HCA-1'
+                else:
+                    errs[k]['name'] = hh
+            print 'err', k
             errs[k]['portRate'] = 'unknown'
 
     # loop over all rates and check they're ok
     for k in rk:
-        if rates[k] != portRate:  # have an error
+        if rates[k] != expectedPortRate[k]: # wrong rate
+            #print k, rates[k], 'expected', expectedPortRate[k]
             if k not in errs.keys():
                 errs[k] = {}
+                # need to add a name if we're going to add an error
                 lid, port = k
-                t, name = findHostByLid( lph, switchTree, lid, port )
-                if t == 'host':
-                    errs[k]['name'] = name + ' HCA-1'
-                elif t == 'switch':
-                    errs[k]['name'] = 'wrongGuid ' + name
-                else:
-                    errs[k]['name'] = 'no idea'
+                t, name = findHostByLid(lph, switchTree, lid, port)
+                errs[k]['name'] = name
             errs[k]['portRate'] = rates[k]
 
 
 def findHostByLid( lph, switchTree, lid, port ):
-    for swLid, swPort, l, hh in lph:
+    for swLid, swPort, l, p, hh in lph:
         if l == lid:
             return ( 'host', hh )
     if (lid, port) in switchTree.keys():
@@ -630,13 +712,16 @@ def printErrLine( e, tt ):
     if 'nlp' not in e.keys():
         # a lid in the ignore list doesn't have any extra keys
         # shouldn't happen now...
-        print 'nlp error', e
+        print 'error: exiting. nlp error', e
         sys.exit(1)
         return ''
 
     if 'type' not in e.keys():   # shouldn't happen
-        print 'type error', e
+        print 'error: exiting. type error', e
         sys.exit(1)
+        return ''
+
+    if 'ignore internal' in e.keys():
         return ''
 
     t = e['type']
@@ -690,16 +775,22 @@ def printErrLine( e, tt ):
         else:
             print ' '*9,
 
+    n,l,p = e['nlp']
+    if n in switchNameMap.keys():
+        n = switchNameMap[n]
     if 'ignore' in e.keys() and e['ignore'] in ('lid', 'host'):  # this is a host that's been rebooted/down
-        print '( *** %5s, %4d, %2d)' % e['nlp'], 'to',
+        print '( *** %5s, %4d, %2d)' % (n,l,p) , 'to',
     else:
-        print '(%10s, %4d, %2d)' % e['nlp'], 'to',
+        print '(%10s, %4d, %2d)' % (n,l,p), 'to',
 
+    n,l,p = e['nlp-otherEnd']
+    if n in switchNameMap.keys():
+        n = switchNameMap[n]
     if 'nlp-otherEnd' in e.keys():
         if 'ignore' in e.keys() and e['ignore'] in ('port'): # otherEnd is rebooted/down host
-            print '( *** %5s, %4d, %2d)' % e['nlp-otherEnd'],
+            print '( *** %5s, %4d, %2d)' % (n,l,p),
         else:
-            print '(%10s, %4d, %2d)' % e['nlp-otherEnd'],
+            print '(%10s, %4d, %2d)' % (n,l,p),
     else:
         print '<unknown in topology>',
 
@@ -791,11 +882,32 @@ def printErrDesc():
    for e, d in errVerbose.iteritems():
       print ' '*(l - len(e)), e, '-',  d
 
+def setExpectedRates(keys, lph, switchTree):
+    # loop over all keys for all ports and set expected rates
+    expectedPortRate = {}
+    for k in keys:
+        pr = defaultPortRate
+        lid, port = k
+        t, name = findHostByLid( lph, switchTree, lid, port )
+        if t == 'host':
+            if name in hostPortRates:
+                pr = hostPortRates[name]
+        else: # switch
+            assert( lid in switchTree.keys() )
+            # rate is set by the host at the other end
+            swName, swLid, a = switchTree[lid]
+            oSwName, oSwLid, oPort = a[port]
+            if oSwName in hostPortRates:
+                pr = hostPortRates[oSwName]
+
+        expectedPortRate[k] = pr
+    return expectedPortRate
+
 def usage():
-   print 'usage:', sys.argv[0], '[-h|--help] [-r|--rebooted] [-a|--allerrs] [-m M|--minerrs=M] [-L|--list] [-l|--low] [-E|--errdesc] [-t|--timedata] [N]'
+   print 'usage:', sys.argv[0], '[-h|--help] [-r|--rebooted] [-a|--allerrs] [-m M|--minerrs=M] [-L|--list] [-l|--low] [-E|--errdesc] [-t|--timedata] [-T r|--threshold=r] [N]'
    print '  --rebooted   do not ignore rebooted hosts/lids'
    print '  --allerrs    report all types of errors, not just', normalErrors
-   print '  --minerrs    do not generate BER/Rcv for SymbolErrors/RcvErrors count less than M. default', minErrCount
+   print '  --minerrs    do not generate BER/Rcv for SymbolErrors/RcvErrors counts of less than M. default', minErrCount
    print '  --list       list possible sets of IB files that could be used, and then exit'
    print '  --low        also output lids with low error count'
    print '  --errdesc    print some descritions of IB errors'
@@ -804,6 +916,7 @@ def usage():
       print 'time'
    else:
       print 'rx data'
+   print '  --threshold  set threshold for SymbolErrorRate. default is IB spec of', ibSymErrThresh
    print 'N is an optional integer that counts back in time through allowable sets of'
    print 'IB files. if omitted the most recent set of files is used (same as N=1).'
    print 'eg. N=2 specifies the second last set of files.'
@@ -811,7 +924,7 @@ def usage():
 
 if __name__ == '__main__':
     try:
-        opts, args = getopt.getopt( sys.argv[1:], 'hdram:LlEt', ['help', 'debug', 'rebooted', 'allerrs', 'minerrs=', 'list', 'low', 'errdesc', 'timedata' ] )
+        opts, args = getopt.getopt( sys.argv[1:], 'hdram:LlEtT:', ['help', 'debug', 'rebooted', 'allerrs', 'minerrs=', 'list', 'low', 'errdesc', 'timedata', 'threshold=' ] )
     except getopt.GetoptError:
          usage()  # print help information and exit
 
@@ -834,6 +947,12 @@ if __name__ == '__main__':
                  usage()
          elif o in ('-L', '--list'):
              listOnly = 1
+         elif o in ('-T', '--threshold'):
+             try:
+                 ibSymErrThresh = float(a)
+                 ibRcvErrThresh = ibSymErrThresh
+             except:  
+                 usage()
          elif o in ('-l', '--low'):
              lowToo = 1
          elif o in ('-E', '--errdesc'):
@@ -906,13 +1025,17 @@ if __name__ == '__main__':
 
     ibNetFile = grp1['ibnetdiscover'][1]
     switchTree, byName, lph, rates = parseIbnetdiscover( ibNetFile=ibNetFile )
-    #print 'switchTree (len', len(switchTree), ')' # , switchTree  # by switch LID
+    #print 'switchTree (len', len(switchTree), ')', switchTree  # by switch LID
+    #print 'switchTree.keys()', switchTree.keys()
     #print 'byName (len', len(byName), ')' # , byName  # by hostname
     #print 'lph (len', len(lph), ')' # , lph  # swlid, swport, lid, host
-    #print 'rates (len', len(rates), ')', rates  # swlid, swport, lid, host
+    #print 'rates (len', len(rates), ')', 'keys', rates.keys() # , rates  # swlid, swport, lid, host
+
+    expectedPortRate = setExpectedRates(rates.keys(), lph, switchTree)
 
     errs = parseIbcheckerrors( allErrs, grp1['ibcheckerrors'][1] )
     #print 'errs', errs  # by (lid, port), but hostname in 'name' field for hosts
+    #print 'errs.keys()', errs.keys()
 
     if 'rebooted' in grp1.keys():
         # use rebooted file...
@@ -951,10 +1074,11 @@ if __name__ == '__main__':
     s = getTraffic( f0=grp0['perfstats'][1], f1=grp1['perfstats'][1] )
 
     print 'tuples are (name, lid, port)'
-    print '* denotes above threshold, - denotes not enough errors, ** denotes non-' + portRate + ' link, *** denotes rebooted'
+    print '* denotes above threshold, - denotes not enough errors, ** denotes incorrect link rate, *** denotes rebooted'
 
-    # find SDR/DDR or 1x 2x links
-    addRateErrs( switchTree, lph, rates, errs )
+    # find eg. SDR/DDR or 1x 2x links
+    addRateErrs( switchTree, lph, rates, errs, expectedPortRate )
+    #print 'errs', errs
 
     # @@@ look for all -ve traffic which might indicate chip reset
 
@@ -963,6 +1087,7 @@ if __name__ == '__main__':
     # process errs and add lots of info to the errs dict
     for k in errs.keys():
         lid, port = k
+        #print 'k', k
 
         if lid in ignoreLid:
             errs[k]['ignore'] = 'lid'
@@ -970,13 +1095,21 @@ if __name__ == '__main__':
         # host
         if lid not in switchTree.keys():
             host = errs[k]['name']
-            if host in ignore and 'ignore' not in errs[k].keys():
+            #print 'lid', lid, 'host', host # , 'byName', byName.keys()
+            if host in weirdInternalHostsOnSwitches:
+                errs[k]['ignore internal'] = 'weird host'
+            # look for 'host' or 'host HCA*'
+            if ( host in ignore or host.split()[0] in ignore ) and 'ignore' not in errs[k].keys():
                 errs[k]['ignore'] = 'host'
             errs[k]['nlp'] = (host, lid, port)
+            if host not in byName.keys():
+                print 'warning: no byName entry for host', host
+                continue
             swPort, swName, swLid = byName[host]
             errs[k]['nlp-otherEnd'] = (swName, swLid, swPort)
 
-            assert( lidType(swName) == 'leaf' )
+            if not allowHostsOnCore:
+                assert( lidType(swName) == 'leaf' )
             errs[k]['type'] = 'host<->' + lidType( swName )
 
             if (swLid, swPort) in errs.keys():
@@ -989,7 +1122,7 @@ if __name__ == '__main__':
 
             if 'errs' in errs[k].keys():
                 errorList = errs[k]['errs']
-                addSymErrRateToErrs( errs, k, errorList, interval )
+                addSymErrRateToErrs( errs, k, errorList, interval, expectedPortRate )
                 addRcvErrRateToErrs( errs, k, errorList )
                 addAlwaysShowErrToErrs( errs, k, errorList )
 
@@ -997,11 +1130,13 @@ if __name__ == '__main__':
 
 
         # switch
-        #print 'lid', lid
         swName, swLid, a = switchTree[lid]
         assert( swLid == lid )
         if port in a.keys():
             oSwName, oSwLid, oPort = a[port]
+
+        if oSwName in weirdInternalHostsOnSwitches:
+             errs[k]['ignore internal'] = 'weird port'
 
         errs[k]['nlp'] = (swName, lid, port)
 
@@ -1010,6 +1145,7 @@ if __name__ == '__main__':
             continue
 
         oSwName, oSwLid, oPort = a[port]
+
         errs[k]['nlp-otherEnd'] = (oSwName, oSwLid, oPort)
 
         ## hack
@@ -1026,7 +1162,12 @@ if __name__ == '__main__':
         #   LC <-> M2
 
         if oSwLid not in switchTree.keys():
-            assert( lidType(swName) == 'leaf' )
+            # this is true only if there is a pure core/leaf/host topology
+            # if any hosts are attached directly to 'core' switches then this will fail
+            if not allowHostsOnCore:
+                if oSwName not in weirdInternalHostsOnSwitches:
+                    #print 'port', port, 'a[port]', a[port]
+                    assert( lidType(swName) == 'leaf' )
             tt = lidType(swName) + '<->host'
             if oSwLid in ignoreLid or oSwName in ignore:
                 errs[k]['ignore'] = 'port'
@@ -1036,11 +1177,18 @@ if __name__ == '__main__':
             if (t, ot) == ('leaf', 'leaf'):
                 tt = 'leaf<->leaf'
             elif t == 'leaf':
-                assert( ot == 'LC' )
-                tt = 'leaf<->LC'
+                if namingScheme == 'unnamed':
+                    assert( ot == 'core' )
+                    tt = 'leaf<->core'
+                else:
+                    assert( ot == 'LC' )
+                    tt = 'leaf<->LC'
             elif t == 'FC':
                 assert( ot == 'LC' )
                 tt = 'FC<->LC'
+            elif t == 'core':
+                assert( ot == 'leaf' )
+                tt = 'core<->leaf'
             elif t == 'LC':
                 if ot == 'leaf':
                     tt = 'LC<->leaf'
@@ -1062,7 +1210,7 @@ if __name__ == '__main__':
 
         if 'errs' in errs[k].keys():
             errorList = errs[k]['errs']
-            addSymErrRateToErrs( errs, k, errorList, interval )
+            addSymErrRateToErrs( errs, k, errorList, interval, expectedPortRate )
             addRcvErrRateToErrs( errs, k, errorList )
             addAlwaysShowErrToErrs( errs, k, errorList )
 
@@ -1096,7 +1244,7 @@ if __name__ == '__main__':
 
     missed = []
     covered = []
-    for tt in ( ('host<->leaf'), ('leaf<->host'), ('leaf<->leaf'), ('leaf<->LC', 'LC<->leaf'), ('LC<->FC', 'FC<->LC') ):
+    for tt in topologyLevels:
         print
         print tt
         print '    Sym       Rcv'

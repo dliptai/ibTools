@@ -17,7 +17,16 @@ startHost='xepbs'
 startHost='vu-pbs'
 startHost='r-pbs'
 startHost='r-pbs HCA-1'
+startHost='hpc-mgmt HCA-1'
+startHost='sorenson HCA-1'
 
+# if all switches are un-named then use a 2 pass approach and serial numbers for switches instead of names
+unnamed=1
+
+# allow multiple ports on the same fabric
+# NOTE - with this =0, you can still have one port on a fabric but it's port #2 of a card.
+#        it's only if you have both port1,port2 on the same fabric that you need this.
+allowMultiPort=0
 
 def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
    f = ibNetFile
@@ -45,6 +54,15 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
    # [1](212800013e60f7)     "S-0021283a842110d2"[28]                # lid 241 lmc 0 "Sun DCS 648 QDR LC switch 1.6" lid 211 4xQDR
    # [2](212800013e60f8)     "S-0021283a842110d2"[29]                # lid 256 lmc 0 "Sun DCS 648 QDR LC switch 1.6" lid 211 4xQDR
 
+   swSerials = {}
+   if unnamed:
+      for l in lines:
+         if l[:6] == 'Switch':
+            s = l.split('"')
+            swSerial = s[1]
+            swLid = int(s[4].split()[4])
+            swSerials[swLid] = swSerial
+
    lph = []
    switchTree = {}
    byName = {}
@@ -52,6 +70,7 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
    d = None
    next = 0
    for l in lines:
+      #print 'l', l
       if next == 'ca':
          s = l.split('"')
          if len(s) < 2:
@@ -63,19 +82,17 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
          lid = int(l.split('#')[1].split()[1])
          port = int(l.split(']')[0].split('[')[1])
          h = host
-         if port != 1: # multi-port HCA
-            h += ' port%d' % port
-         lph.append( ( swlid, swport, lid, h ) )
-         rates[(lid, 1)] = l.split()[-1]
+         if allowMultiPort:
+            if port != 1: # multi-port HCA
+               h += ' port%d' % port
+         #print 'lph appending', h
+         lph.append( ( swlid, swport, lid, port, h ) )
+         rates[(lid, port)] = l.split()[-1]
          next = 'ca' # goto next port on this HCA
       elif l[:2] == 'Ca':
          host = l.split('"')[3]
          h = host.split()
-         if len(h) > 1:
-            if h[1] == 'HCA-1' or h[1] == 'HCA-2':
-                host = host.split()[0]
-                host += ' ' + host[1]  # append HCA-* to the hostname
-         else:
+         if len(h) == 0 or h[0] == '@':  # unnamed can be eg. '@ HCA-1'
             #print 'skipping unnamed node', l,
             next = 0
             continue
@@ -83,13 +100,17 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
          next = 'ca'
       elif l[:6] == 'Switch':
          s = l.split('"')
-         if len(s[3].split()) > 1:
-            swName = s[3].split()[1]
+         swLid = int(s[4].split()[4])
+         if unnamed:
+            swName = swSerials[swLid]
          else:
-            swName = s[3]
+            if len(s[3].split()) > 1:
+               swName = s[3].split()[1]
+            else:
+               swName = s[3]
          if swName == '' or swName == '-':
             print 'error. unnamed switch chip', s
-         swLid = int(s[4].split()[4])
+         #print 'switch', 'l', l, 's', s, 's[3]', s[3], 'swName', swName
          #print 'sw', swName, 'lid', swLid
          d = {}
          next = 'ports'
@@ -108,13 +129,17 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
          t = s[1][0]
          if t == 'H':    # host at the end of this port
             name = s[3]
-            if remPort != 1:  # found a multi-port HCA. append the port number to the name
-               name += ' port%d' % remPort
+            if allowMultiPort:
+               if remPort != 1:  # found a multi-port HCA. append the port number to the name
+                  name += ' port%d' % remPort
          elif t == 'S':  # switch  ""
-            if len(s[3].split()) > 1:
-               name = s[3].split()[1]
+            if unnamed:
+               name = swSerials[lid]
             else:
-               name = s[3]
+               if len(s[3].split()) > 1:
+                  name = s[3].split()[1]
+               else:
+                  name = s[3]
          else:
             print 'unknown type of link from switch. line is', l
             continue

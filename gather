@@ -1,9 +1,11 @@
 #!/bin/sh
 
-export PATH=$PATH:/usr/sbin:/root/ib
+dir=/root/ib
 
-addr=some_email_addr
-mach=some_machine
+export PATH=$PATH:/usr/sbin:$dir
+
+addr="sc-admin@swin.edu.au"
+mach="sorenson"
 
 file="`date +'%F-%T'`"
 # serial
@@ -13,7 +15,8 @@ for f in ibnetdiscover; do
    $f > $file.$n 2>&1
 done
 # parallel
-for f in "ibcheckerrors.rjh -N -T /root/ib/thresholds $file.ibnetdiscover" ibchecknet "ibdiagnet -ls 10 -lw 4x -c 1" ibnodes "ibqueryerrors -rR -s LinkDowned,RcvSwRelayErrors,XmtDiscards,XmtWait"; do
+#for f in "ibcheckerrors.rjh -N -T $dir/thresholds $file.ibnetdiscover" ibchecknet "ibdiagnet -ls 10 -lw 4x -c 1" ibnodes "ibqueryerrors -rR -s LinkDowned,RcvSwRelayErrors,XmtDiscards,XmtWait"; do
+for f in "ibcheckerrors.rjh -N -T $dir/thresholds $file.ibnetdiscover" "ibdiagnet -ls 10 -lw 4x --ber_test" ibnodes "ibqueryerrors -rR -s LinkDowned,RcvSwRelayErrors,XmtDiscards,XmtWait"; do
    n=`echo $f | cut -d. -f1`
    n=`echo $n | cut -d' ' -f1`
    $f > $file.$n 2>&1 &
@@ -21,16 +24,22 @@ done
 wait
 ibPerfqueryAll.py $file.perfstats > $file.perfstats.out 2>&1
 rebootedRecently.py > $file.rebooted
-ibFlagErrors.py > $file.flagerrors.summary
+# only flag errs at 1e-11 and above, even though the standard is 1e-12
+ibFlagErrors.py -T 1e-11 > $file.flagerrors.summary
 ibFlagErrors.py -a -l -r > $file.flagerrors
 
-# look for known serious patterns, excluding [1-2]e-12
-cat $file.flagerrors.summary | grep ibwarn                                                                                                      > $file.flagerrors.summary.errs
-cat $file.flagerrors.summary | egrep -B2 '1x|2x|DDR|SDR|^ \*|>\*' | grep -v '^ \*[1-2]\..e-12' | egrep -B2 '1x|2x|DDR|SDR|^ \*|>\*' | grep -v -- -- >> $file.flagerrors.summary.errs
-cat $file.flagerrors.summary | grep 'LinkRecover' | grep -v 'only displaying' >> $file.flagerrors.summary.errs
+# look for eg.
+#   src/query_smp.c:197; umad (DR path slid 0; dlid 0; 0,1,19,34,12 Attr 0x11:0) bad status 110; Connection timed out
+cat $file.ibnetdiscover | grep  query_smp   > $file.flagerrors.summary.errs
+
+# look for known serious patterns
+cat $file.flagerrors.summary | grep ibwarn >> $file.flagerrors.summary.errs
+#cat $file.flagerrors.summary | egrep -B2 '1x|2x|DDR|SDR|^ \*|>\*' | grep -v '^ \*[1-2]\..e-12' | egrep -B2 '1x|2x|DDR|SDR|^ \*|>\*' | grep -v -- -- >> $file.flagerrors.summary.errs
+#cat $file.flagerrors.summary | grep 'LinkRecover' | grep -v 'only displaying' >> $file.flagerrors.summary.errs
+cat $file.flagerrors.summary | grep -B2 errs | grep -v -- -- >> $file.flagerrors.summary.errs
 if [ -s $file.flagerrors.summary.errs ]; then
    if [ $# -ne 0 ]; then
-      /bin/mail -s "$mach IB errors" $addr -- -f $addr < $file.flagerrors.summary.errs
+      ( cat $file.flagerrors.summary.errs ; echo ""; echo "see /root/ib/ on sorenson for details" ) | /bin/mail -s "$mach IB errors" $addr
    fi
 else
    rm $file.flagerrors.summary.errs

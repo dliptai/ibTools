@@ -1,6 +1,8 @@
 #!/bin/sh
 
-export PATH=$PATH:/usr/sbin:/root/ib
+dir=/root/ib
+
+export PATH=$PATH:/usr/sbin:$dir
 
 file="`date +'%F-%T'`"
 # serial
@@ -10,7 +12,7 @@ for f in ibnetdiscover; do
    $f > $file.$n 2>&1
 done
 # parallel
-for f in "ibcheckerrors.rjh -N -T /root/ib/thresholds $file.ibnetdiscover" "ibqueryerrors -rR -s LinkDowned,RcvSwRelayErrors,XmtDiscards,XmtWait"; do
+for f in "ibcheckerrors.rjh -N -T $dir/thresholds $file.ibnetdiscover" "ibqueryerrors -rR -s LinkDowned,RcvSwRelayErrors,XmtDiscards,XmtWait"; do
    n=`echo $f | cut -d. -f1`
    n=`echo $n | cut -d' ' -f1`
    $f > $file.$n 2>&1 &

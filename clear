@@ -3,6 +3,7 @@
 export PATH=$PATH:/usr/sbin
 
 file="`date +'%F-%T'`"
-for f in ibclearerrors; do
-   $f > $file.$f
+for f in 'ibqueryerrors --clear-errors'; do # ibclearerrors; do
+   #$f > $file.$f
+   $f > $file.ibclearerrors
 done

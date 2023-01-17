@@ -23,6 +23,7 @@ ibDir = '/root/ib'
 
 portsAtOnce = 1000
 perfCmd = '/opt/root/perfqueryMany'
+perfCmd = ibDir + '/perfqueryMany'
 
 def runChunkedIbperfs( lpn ):
    chunks = len(lpn)/portsAtOnce
@@ -42,6 +43,7 @@ def runChunkedIbperfs( lpn ):
          #print 'i', i, 'lpn', lpn[i]
          cmd += ' %d %d' % ( lid, port )
 
+      #print cmd
       r = runIbperfCommand( cmd )
       #print 'r', r
       parseToStats( s, r, lpn, start )
@@ -54,15 +56,15 @@ def runIbperfCommand( cmd ):
    r = out.split('\n')
    # write any errs to stderr
    if len(err):
-      sys.stderr.write( sys.argv[0] + ': Error: runIbperfCommand: ' +  err )
+      sys.stderr.write( sys.argv[0] + ': Error: runIbperfCommand: ' +  err)
    return r
 
 def lidPorts( lidPortHost, switchTree ):
    lpn = []
 
    hCnt = 0
-   for swl,swp,l,h in lidPortHost:
-      lpn.append( ( l, 1, h ) )
+   for swl,swp,l,p,h in lidPortHost:
+      lpn.append( ( l, p, h ) )
       hCnt += 1
 
    swCnt = 0
@@ -112,12 +114,18 @@ def parseToStats( s, r, lpn, start ):
 
    # <some errors>
    # timestamp 1264494583.110014
+   # timestamp 1264494583.110014
+   # timestamp 1264494583.110014
 
    cnt = start
    reading = 0
    d = None
    for i in r:
-      if i[:6] == '# Port':
+      #print i
+      if len(i) > 0 and i[0] == 'ibwarn:':   # skip
+         # ibwarn: [1317266] dump_perfcounters: perfextquery
+         continue
+      elif i[:6] == '# Port':
          ii = i.split(':')[1]
          ii = ii.split()
          looping = 1
