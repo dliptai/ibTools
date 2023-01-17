@@ -6,13 +6,9 @@
 # get IB network stats from all IB hardware and dump to a file.
 
 import getopt
-import os
 import pickle
-import socket
-import string
 import subprocess
 import sys
-import time
 
 from ibTracePorts import parseIbnetdiscover
 

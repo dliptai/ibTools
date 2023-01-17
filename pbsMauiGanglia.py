@@ -3,7 +3,6 @@
 # (c) Robin Humble 2003,2004,2005,2006,2007,2008
 # licensed under the GPL v3
 
-import copy
 import grp
 import os
 import pwd
@@ -155,7 +154,7 @@ class loadedNetsGmond:
 
             try:
                 self.loads[host] = float(all[host]["load_one"])
-            except KeyError as theError:
+            except KeyError:
                 print(host, "load_one not in ganglia")
                 # pass  # silent failure
             try:
@@ -166,7 +165,7 @@ class loadedNetsGmond:
                     float(all[host]["cpu_wio"]),
                     float(all[host]["cpu_idle"]),
                 )
-            except KeyError as theError:
+            except KeyError:
                 print(host, "cpu user/nice/system/wio/idle not in ganglia")
                 # pass  # silent failure
 
@@ -1642,7 +1641,6 @@ class maui:
 
         n = None
         state = "Running"
-        cache = {}
         for q in queued:
             c = q["cpus"]
             state = q["state"]

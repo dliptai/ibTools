@@ -18,9 +18,7 @@
 #  - if it looks like new hosts have been added to the fabric, then re-run ibnetdiscover
 
 import json
-import os
 import socket
-import string
 import subprocess
 import sys
 import time
