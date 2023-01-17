@@ -36,7 +36,7 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
    if f == None:
       suffix = 'ibnetdiscover'
       f, fTime = findMostRecentFile( d, suffix )
-   print 'using', f, 'in dir', d
+   print('using', f, 'in dir', d)
    f = d + '/' + f
    lines = open( f, 'r' ).readlines()
    #print lines
@@ -109,7 +109,7 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
             else:
                swName = s[3]
          if swName == '' or swName == '-':
-            print 'error. unnamed switch chip', s
+            print('error. unnamed switch chip', s)
          #print 'switch', 'l', l, 's', s, 's[3]', s[3], 'swName', swName
          #print 'sw', swName, 'lid', swLid
          d = {}
@@ -141,7 +141,7 @@ def parseIbnetdiscover( ibDir=None, ibNetFile=None ):
                else:
                   name = s[3]
          else:
-            print 'unknown type of link from switch. line is', l
+            print('unknown type of link from switch. line is', l)
             continue
          d[port] = [ name, lid, remPort ]
          if t == 'H':
@@ -185,8 +185,8 @@ if __name__ == '__main__':
    elif len(sys.argv) == 2:
       path = sys.argv[1]
    else:
-      print 'usage', sys.argv[0], '<path> [ibnetdiscover file]'
-      print 'eg.', sys.argv[0], '0,1,31,18,33,31,27  /root/ib/2010-04-07-15:02:29.ibnetdiscover'
+      print('usage', sys.argv[0], '<path> [ibnetdiscover file]')
+      print('eg.', sys.argv[0], '0,1,31,18,33,31,27  /root/ib/2010-04-07-15:02:29.ibnetdiscover')
       sys.exit(1)
 
    switchTree, byName, lph, r = parseIbnetdiscover(ibNetFile=ibNetFile)
@@ -195,12 +195,12 @@ if __name__ == '__main__':
 
    name = socket.gethostname()
    if name != startHost:
-      print 'WARNING - the port trace is assumed to be relative to', startHost, 'not this host', name
+      print('WARNING - the port trace is assumed to be relative to', startHost, 'not this host', name)
       #sys.exit(1)
       name = startHost
    start = byName[name]
    port, swName, swLid = start
-   print 'start at', name, 'lid', swLid, 'attached to switch', swName, 'port', port
+   print('start at', name, 'lid', swLid, 'attached to switch', swName, 'port', port)
    loc = swLid
 
    # eg.  1,31,1,33,33    <- a dead link
@@ -216,10 +216,10 @@ if __name__ == '__main__':
    # pull off initial '0,' if there is one
    if path[:2] == '0,':
       path = path[2:]
-   print 'path', path
+   print('path', path)
 
    if path[:2] != '1,':
-      print 'we assume path always starts with "1,". need to fix this script if you want something else.'
+      print('we assume path always starts with "1,". need to fix this script if you want something else.')
       sys.exit(1)
    else:
       path = path[2:]
@@ -232,6 +232,6 @@ if __name__ == '__main__':
       nextHop = d[p]
       #print 'nextHop', nextHop
       name, loc, remPort = nextHop
-      print '... travelling to port', p, '(%s, lid %d)' % ( name, loc )
+      print('... travelling to port', p, '(%s, lid %d)' % ( name, loc ))
 
-   print 'destination', name, 'lid', loc, 'port', remPort
+   print('destination', name, 'lid', loc, 'port', remPort)

@@ -24,7 +24,7 @@ import subprocess
 import socket
 import os
 import json
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 #from pbsMauiGanglia import gangliaStats
 from ibTracePorts import parseIbnetdiscover
@@ -160,7 +160,7 @@ def findUpDown(all, timeout):
 def listOfUpHosts(deadTimeout):
     #g = gangliaStats( reportTimeOnly=1 )
     #all = g.getAll()
-    all = json.load(urllib2.urlopen(gmond_lastReported))
+    all = json.load(urllib.request.urlopen(gmond_lastReported))
 
     up, down = findUpDown(all, deadTimeout)
     up.sort()
@@ -189,7 +189,7 @@ def getIp(host):
    try:
       ip = ipCache[host]
    except:
-      print 'host', host, 'not in ipCache'
+      print('host', host, 'not in ipCache')
       ip = socket.gethostbyname(host)
       ipCache[host] = ip
    return ip
@@ -432,27 +432,27 @@ def ratesToGmetric(gm, rates, up):
 
       if txData > dataMax or txData < 0:
          if weirdCnt < weirdThresh:
-            print 'trapped weird txData', txData, 'host', i
+            print('trapped weird txData', txData, 'host', i)
          weirdCnt += 1
          txData = 0.0
       if rxData > dataMax or rxData < 0:
          if weirdCnt < weirdThresh:
-            print 'trapped weird rxData', rxData, 'host', i
+            print('trapped weird rxData', rxData, 'host', i)
          weirdCnt += 1
          rxData = 0.0
       if txPkts > pktsMax or txPkts < 0:
          if weirdCnt < weirdThresh:
-            print 'trapped weird txPkts', txPkts, 'host', i
+            print('trapped weird txPkts', txPkts, 'host', i)
          weirdCnt += 1
          txPkts = 0.0
       if rxPkts > pktsMax or rxPkts < 0:
          if weirdCnt < weirdThresh:
-            print 'trapped weird rxPkts', rxPkts, 'host', i
+            print('trapped weird rxPkts', rxPkts, 'host', i)
          weirdCnt += 1
          rxPkts = 0.0
 
       if weirdCnt >= weirdThresh:
-         print 'trapped many weird pkts/data - cnt', weirdCnt
+         print('trapped many weird pkts/data - cnt', weirdCnt)
 
       if gmondFormat == 'collectl':
          gm.send( 'iconnect.kbout',  '%.2f' % (txData/1024.0), 'double', 'kb/sec',      'both', 60, 0, 'infiniband', spoofStr )
@@ -461,10 +461,10 @@ def ratesToGmetric(gm, rates, up):
          gm.send( 'iconnect.pktin',  '%.2f' % rxPkts,          'double', 'packets/sec', 'both', 60, 0, 'infiniband', spoofStr )
       else:
          if debug:
-           print 'gm.send( sorenson_ib_bytes_out, %.2f' % txData, 'double, kb/sec,      both, 60, 0, infiniband', spoofStr, ')'
-           print 'gm.send( sorenson_ib_bytes_in,  %.2f' % rxData, 'double, kb/sec,      both, 60, 0, infiniband', spoofStr, ')'
-           print 'gm.send( sorenson_ib_pkts_out,  %.2f' % txPkts, 'double, packets/sec, both, 60, 0, infiniband', spoofStr, ')'
-           print 'gm.send( sorenson_ib_pkts_in,   %.2f' % rxPkts, 'double, packets/sec, both, 60, 0, infiniband', spoofStr, ')'
+           print('gm.send( sorenson_ib_bytes_out, %.2f' % txData, 'double, kb/sec,      both, 60, 0, infiniband', spoofStr, ')')
+           print('gm.send( sorenson_ib_bytes_in,  %.2f' % rxData, 'double, kb/sec,      both, 60, 0, infiniband', spoofStr, ')')
+           print('gm.send( sorenson_ib_pkts_out,  %.2f' % txPkts, 'double, packets/sec, both, 60, 0, infiniband', spoofStr, ')')
+           print('gm.send( sorenson_ib_pkts_in,   %.2f' % rxPkts, 'double, packets/sec, both, 60, 0, infiniband', spoofStr, ')')
          else:
            gm.send( 'sorenson_ib_bytes_out', '%.2f' % txData, 'double', 'kb/sec',      'both', 60, 0, 'infiniband', spoofStr )
            gm.send( 'sorenson_ib_bytes_in',  '%.2f' % rxData, 'double', 'kb/sec',      'both', 60, 0, 'infiniband', spoofStr )
@@ -475,16 +475,16 @@ def parseArgs():
    global hostMode
 
    if len(sys.argv) != 2:
-      print 'needs --host or --switch'
+      print('needs --host or --switch')
       sys.exit(1)
    if sys.argv[1] == '--host':
       hostMode = 'host'
    elif sys.argv[1] == '--switch':
       hostMode = 'switch'
    else:
-      print 'needs --host or --switch'
+      print('needs --host or --switch')
       sys.exit(1)
-      
+
 if __name__ == '__main__':
    first = 1
 
@@ -516,7 +516,7 @@ if __name__ == '__main__':
       if newNodesFound:
          netdiscoverLoop += 1
          if netdiscoverLoop in ( 1, 2, 10, 100, 1000 ):
-            print 'netdiscover loop', netdiscoverLoop
+            print('netdiscover loop', netdiscoverLoop)
             fail = runIbnetdiscover()
             if fail:
                sys.stderr.write( sys.argv[0] + ': Error: runIbnetdiscover failed. sleeping 30s\n' )

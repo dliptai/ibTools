@@ -25,13 +25,13 @@ ignore = filterHosts( uptime, fTime )
 ignore.sort()
 #print 'recently rebooted - ignore hosts', ignore, 'len', len(ignore)
 
-print '# nodes rebooted in last', hms(time.time() - fTime)
+print('# nodes rebooted in last', hms(time.time() - fTime))
 for i in ignore:
     if i in down:
         continue
-    print i
+    print(i)
 
 # no idea about down nodes, so assume they're evil
-print '# down'
+print('# down')
 for i in down:
-    print i
+    print(i)

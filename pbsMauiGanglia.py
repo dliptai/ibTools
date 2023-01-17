@@ -122,7 +122,7 @@ class loadedNetsGmond():
         # combine the loaded/unloads nets dicts into one...
         netLoad = {}
         for d in ( self.loadedNet, self.unloadedNet ):
-            for k, v in d.iteritems():
+            for k, v in d.items():
                 netLoad[k] = v
 
         return ( netLoad, self.loads, self.cpuUsage, self.up )
@@ -144,13 +144,13 @@ class loadedNetsGmond():
 
             try:
                 self.loads[host] = float(all[host]['load_one'])
-            except KeyError, theError:
-                print host, 'load_one not in ganglia'
+            except KeyError as theError:
+                print(host, 'load_one not in ganglia')
                 #pass  # silent failure
             try:
                 self.cpuUsage[host] = ( float(all[host]['cpu_user']), float(all[host]['cpu_nice']), float(all[host]['cpu_system']), float(all[host]['cpu_wio']), float(all[host]['cpu_idle']) )
-            except KeyError, theError:
-                print host, 'cpu user/nice/system/wio/idle not in ganglia'
+            except KeyError as theError:
+                print(host, 'cpu user/nice/system/wio/idle not in ganglia')
                 #pass  # silent failure
 
         #print 'self.loads', self.loads
@@ -180,7 +180,7 @@ class gangliaStats:
             gmondUrl = hp[2]
             x = self.read( gmondHost, gmondPort )  # load em up
             if x == None:
-                print 'no data from gmondHost, gmondPort', gmondHost, gmondPort
+                print('no data from gmondHost, gmondPort', gmondHost, gmondPort)
                 continue
             a = self.parseXml( x, metrics, reportTimeOnly )
 
@@ -211,7 +211,7 @@ class gangliaStats:
             return None
         i = a[host]['gmondGroup']
         if i > len(config.gmonds):
-            print 'gmondConfigByHost: error: len(gmond.gmonds)', len(config.gmonds), 'i', i
+            print('gmondConfigByHost: error: len(gmond.gmonds)', len(config.gmonds), 'i', i)
             sys.exit(1)
         c = config.gmonds[i]  # array of host,port,url
         return ( i, c[0], c[1], c[2] )  # return as tuple
@@ -346,7 +346,7 @@ class gangliaStats:
                 if not quiet and name not in config.shn:  # skip spoof'd data without a time from shelves
                     now = time.time()
                     if now - d[name]['reported'] < deadTimeout:  # up but confused
-                        print 'mem gmond data from', name, 'is incomplete in a confusing way - restart its gmond?'
+                        print('mem gmond data from', name, 'is incomplete in a confusing way - restart its gmond?')
                 #print d[name]
                 #sys.exit(1)
 
@@ -461,7 +461,7 @@ class pbsNodes:
             pbsNodesCommand = None
             parse = self.slurmNodes
         else:
-            print 'unknown batch system in pbsNodes:', config.batchType
+            print('unknown batch system in pbsNodes:', config.batchType)
             sys.exit(1)
 
         l = None
@@ -541,7 +541,7 @@ class pbsNodes:
             try:
                 cores = int(l[4])
             except:
-                print 'parseAnuPbs: could not read cores from pbsnodes'
+                print('parseAnuPbs: could not read cores from pbsnodes')
                 sys.exit(1)
 
             try:
@@ -578,10 +578,10 @@ class pbsNodes:
 
     def parseTorqueXml(self, ll):
         if len(ll) == 0:
-            print 'possible connection problem to the pbs server'
+            print('possible connection problem to the pbs server')
             return
         elif len(ll) != 1:
-            print 'cannot talk to pbs server, or pbsnodes -x format has changed - expect all one line'
+            print('cannot talk to pbs server, or pbsnodes -x format has changed - expect all one line')
             sys.exit(1)
 
         dom = minidom.parseString( ll[0] )
@@ -691,7 +691,7 @@ class pbsJobs:
                     step = int(r.split(':')[1])
                     r = rr
     # JobId=2565783 ArrayJobId=2565783 ArrayTaskId=1-3,5,12-13,19,21-24,26,30-31,35-36,38,42,46,50,53,55,61-62,... JobName=bns_injections
-    # so rr = 1-3,5,12-13,19,21-24,26,30-31,35-36,38,42,46,50,53,55,61-62,... 
+    # so rr = 1-3,5,12-13,19,21-24,26,30-31,35-36,38,42,46,50,53,55,61-62,...
     # darn
                 rr = parseCpuList(r)  # 0-60,81-100,1000
                 jj = []
@@ -742,7 +742,7 @@ class pbsJobs:
             elif 'tres_per_node' in j.keys():  # slurm 19
                 i='tres_per_node'
             else:
-                print "don't know how to get gres/tres"
+                print("don't know how to get gres/tres")
                 sys.exit(1)
             for g in j[i].split(','):
                 g = g.split(':')
@@ -888,7 +888,7 @@ class pbsJobs:
             l[i] = l[i].strip()
 
         if len(l) != 2:
-            print 'not 2 fields - weird', l
+            print('not 2 fields - weird', l)
             sys.exit(1)
 
         return l
@@ -1058,7 +1058,7 @@ class pbsJobs:
         numGpus = 0
         # some really odd queued jobs might have 'select' instead of 'nodes'
         nodes_k = 'Resource_List.nodes'
-	if nodes_k not in dict.keys():
+        if nodes_k not in dict.keys():
             if dict['job_state'] == 'Q' and 'Resource_List.select' in dict.keys():
                 nodes_k = 'Resource_List.select'
                 #print 'using select'
@@ -1222,9 +1222,9 @@ class maui:
         if dummyRun:
             try:
                 f = open( 'yo-showq', 'r' )
-            except IOError, theError:
+            except IOError as theError:
                 openOk = 0
-                print theError, '... continuing anyway'
+                print(theError, '... continuing anyway')
         else:
             f = os.popen( config.mauiPath + '/showq', 'r' )
 
@@ -1265,13 +1265,13 @@ class maui:
                 # print 'found jobname'
                 modeNum += 1
                 if modeNum > len(self.modes)-1:
-                    print 'ran out of modes reading showq data'
+                    print('ran out of modes reading showq data')
                     sys.exit(1)
                 mode = self.modes[modeNum]
                 reading = 1                # read the next (blank) line
                 l = f.readline()
                 if len(l) != 1:
-                    print 'next line wasn\'t blank'
+                    print('next line wasn\'t blank')
                     sys.exit(1)
                 continue
 
@@ -1283,11 +1283,11 @@ class maui:
                 continue
 
             if len(l) != 9:
-                print 'unknown data line format', l
+                print('unknown data line format', l)
                 sys.exit(1)
 
             if modeNum < 0:
-                print 'impossible'
+                print('impossible')
                 sys.exit(1)
 
             jobId = l[0]  # can be a job array string [], so can't make this an int
@@ -1410,7 +1410,7 @@ class maui:
                 self.res[res] = []
 
             if hn == None:
-                print 'mistake in res parsing'
+                print('mistake in res parsing')
                 continue
 
             self.res[res].append( hn )
@@ -1429,9 +1429,9 @@ class maui:
         if self.data == None:
             self.readShowq()
         for m in self.modes:
-            print m
+            print(m)
             for l in self.data[m]:
-                print l
+                print(l)
 
     def nextToRunNodes( self ):
         queued = self.getQueuedList()

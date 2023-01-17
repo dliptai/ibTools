@@ -19,7 +19,7 @@
 # should also read ibdiagnet to look for links the wrong speed, although this
 # into is also returned by netdiscover so use that instead.
 
-import os, sys, getopt, time, cPickle, math
+import os, sys, getopt, time, pickle, math
 from ibTracePorts import parseIbnetdiscover, findMostRecentFile, findMostRecentFiles
 from hms import hms
 try:
@@ -146,7 +146,7 @@ def findGroupsOfFiles(d):
     """find tuples of perfstats, ibcheckerrors, rebooted (optional), ibnetdiscover, ibclearerrors
        where the filenames must all have the same prefix except ibclearerrors
        which needs to have a timestamp within maxAfterTime of last file in the group (perfstats)
-       
+
        also, any misc 'ibclearerrors' on its own invalidates the group(s) following it until
        the next ibclearerrors"""
 
@@ -176,7 +176,7 @@ def findGroupsOfFiles(d):
 
     # then loop through and del solo's
     f = {}
-    for i,d in g.iteritems():
+    for i,d in g.items():
        if len(d) != 1:
           f[i] = d
           continue
@@ -189,7 +189,7 @@ def findGroupsOfFiles(d):
 
     # then loop through and put byTime back together
     bt = []
-    for i,d in f.iteritems():
+    for i,d in f.items():
        for j in d:
           suffix,b = j
           bt.append(b)
@@ -252,7 +252,7 @@ def findGroupsOfFiles(d):
         elif not fail and not clear: # some partial state - probably a gather_quick without a clear
             g['state'] = 'semi-ok'
         else:
-            print 'impossible'
+            print('impossible')
             sys.exit(1)
 
         groups[i] = g
@@ -261,7 +261,7 @@ def findGroupsOfFiles(d):
         for i in range(len(groups)-20,len(groups)):
             if i < 0:
                 continue
-            print 'group[%d]' % i, groups[i]
+            print('group[%d]' % i, groups[i])
 
     # make a list of possible pairs of groups that can be compared
     pairs = []
@@ -303,7 +303,7 @@ def findGroupsOfFiles(d):
             lastOk = -1
 
     if debug:
-         print 'last few pairs', pairs[-10:], 'end', end
+         print('last few pairs', pairs[-10:], 'end', end)
          #sys.exit(1)
 
     return groups, pairs
@@ -353,7 +353,7 @@ def parseIbcheckerrors(allErrs, ibCheckFile=None):
    if f == None:
        suffix = 'ibcheckerrors'
        f, fTime = findMostRecentFile( ibDir, suffix )
-   print 'using', f, 'for errors'
+   print('using', f, 'for errors')
    lines = open( ibDir + '/' + f, 'r' ).readlines()
    #print lines
 
@@ -365,16 +365,16 @@ def parseIbcheckerrors(allErrs, ibCheckFile=None):
    # ibwarn: [22811] _do_madrpc: recv failed: Invalid argument
    # ibwarn: [22811] mad_rpc: _do_madrpc failed; dport (DR path slid 0; dlid 0; 0,1,31,18,3,31)
    # ibwarn: [22811] discover: can't reach node DR path slid 0; dlid 0; 0,1,31,18,3,31 port 18
-   # 
+   #
    # normal stuff ->
    #
    # #warn: counter SymbolErrors = 65534 (threshold 10) lid 2 port 255
    # #warn: counter LinkDowned = 254 (threshold 10) lid 2 port 255
-   # Error check on lid 2 (0x0021283a89190040 qnem-13-3a) port all:  FAILED 
+   # Error check on lid 2 (0x0021283a89190040 qnem-13-3a) port all:  FAILED
    # #warn: counter SymbolErrors = 722 (threshold 10) lid 259 port 255
-   # Error check on lid 259 (0x0021283a87820050 qnem-13-1b) port all:  FAILED 
+   # Error check on lid 259 (0x0021283a87820050 qnem-13-1b) port all:  FAILED
    # #warn: counter SymbolErrors = 722 (threshold 10) lid 259 port 21
-   # Error check on lid 259 (0x0021283a87820050 qnem-13-1b) port 21:  FAILED 
+   # Error check on lid 259 (0x0021283a87820050 qnem-13-1b) port 21:  FAILED
    # #warn: counter SymbolErrors = 11251     (threshold 10) lid 1447 port 12
    # #warn: counter LinkRecovers = 255       (threshold 10) lid 1447 port 12
    # #warn: counter RcvErrors = 2342         (threshold 10) lid 1447 port 12
@@ -404,13 +404,13 @@ def parseIbcheckerrors(allErrs, ibCheckFile=None):
       if l[0] == 'ibwarn:':
          if 'dump_perfcounters:' in l and 'PortXmitWait' in l:
             continue
-         print ll
+         print(ll)
          continue
 
       #print l
       if l[0] == "#warn:":
          if l[-2] != "port":
-            print 'expected a port in a #warn, not "', ll, '"'
+            print('expected a port in a #warn, not "', ll, '"')
             continue
          lid = int(l[-3])
          port = int(l[-1])
@@ -476,7 +476,7 @@ def lidType( n ):
             elif nn[1][0] == 'S':
                 return 'FC'
             else:
-                print 'unknown', namingScheme, 'fc or lc', n
+                print('unknown', namingScheme, 'fc or lc', n)
                 return None
         if n[:2] == 'ib':  # ib#...
             return 'leaf'
@@ -497,7 +497,7 @@ def lidType( n ):
             return 'leaf'
 
     else:
-        print 'unknown fabric naming scheme'
+        print('unknown fabric naming scheme')
         return None
 
 
@@ -528,13 +528,13 @@ def findHostLid( hosts ):
                 lids.append(lid)
         if not found:
             if debug:
-                print 'warning - lid for host', h, 'not found'
+                print('warning - lid for host', h, 'not found')
             hl.append( (h, None) )
     return hl, lids
 
 def restoreStats( fn ):
     f = open( fn, 'r' )
-    s = cPickle.load( f )
+    s = pickle.load( f )
     f.close()
     return s
 
@@ -543,7 +543,7 @@ def getTraffic( f0=None, f1=None ):
     fn1 = f1
     if fn0 == None or fn1 == None:
         fn1, t, fn0, t = findMostRecentFiles( ibDir, 'perfstats' )
-    print 'traffic', fn0, 'to', fn1
+    print('traffic', fn0, 'to', fn1)
     s1 = restoreStats( ibDir + '/' + fn1 )
     s0 = restoreStats( ibDir + '/' + fn0 )
     return subStats( s0, s1 )
@@ -585,14 +585,14 @@ def printMB( s, lid, port, oLid, oPort ):
     tx, rx = getB( s, lid, port )
     otx, orx = getB( s, oLid, oPort )
     if tx != None:
-        print 'tx/rx %.1f %.1f MB' % ( tx/MB, rx/MB ),
+        print('tx/rx %.1f %.1f MB' % ( tx/MB, rx/MB ))
         traffic = ( tx, rx )
     else: # use other end of link
         if otx != None:  # note, reversed...
-            print 'tx/rx %.1f %.1f MB (other end of link)' % ( orx/MB, otx/MB ),
+            print('tx/rx %.1f %.1f MB (other end of link)' % ( orx/MB, otx/MB ))
             traffic = ( orx, otx )
         else:
-            print 'no traffic info for either end of link available',
+            print('no traffic info for either end of link available')
             traffic = ( None, None )
     return traffic
 
@@ -681,7 +681,7 @@ def addRateErrs( switchTree, lph, rates, errs, expectedPortRate ):
                     errs[k]['name'] = hh + ' HCA-1'
                 else:
                     errs[k]['name'] = hh
-            print 'err', k
+            print('err', k)
             errs[k]['portRate'] = 'unknown'
 
     # loop over all rates and check they're ok
@@ -712,12 +712,12 @@ def printErrLine( e, tt ):
     if 'nlp' not in e.keys():
         # a lid in the ignore list doesn't have any extra keys
         # shouldn't happen now...
-        print 'error: exiting. nlp error', e
+        print('error: exiting. nlp error', e)
         sys.exit(1)
         return ''
 
     if 'type' not in e.keys():   # shouldn't happen
-        print 'error: exiting. type error', e
+        print('error: exiting. type error', e)
         sys.exit(1)
         return ''
 
@@ -744,13 +744,13 @@ def printErrLine( e, tt ):
 
         skip = 0
         if 'symErrRate' in e.keys():
-            rate, src, plus = e['symErrRate']    
+            rate, src, plus = e['symErrRate']
             if src == 'skip':
                 skip += 1
             elif rate < ibSymErrThresh:
                 skip += 1
         if 'rcvErrRate' in e.keys():
-            rate, src, plus = e['rcvErrRate']    
+            rate, src, plus = e['rcvErrRate']
             if src == 'skip':
                 skip += 1
             elif rate < ibRcvErrThresh:
@@ -760,39 +760,39 @@ def printErrLine( e, tt ):
 
     for et, er, en in ( ('symErrRate', ibSymErrThresh, 'BER'), ('rcvErrRate', ibRcvErrThresh, 'Rcv') ):
         if et in e.keys():
-            rate, src, plus = e[et]    
+            rate, src, plus = e[et]
             p = ' '
             if plus:
                 p = '>'
             if src == 'skip':
-                print '    -    ',
+                print('    -    ')
             elif rate > er:
-                print p + '*%#7.2g' % rate,
+                print(p + '*%#7.2g' % rate)
             else:
-                print p + ' %#7.2g' % rate,
+                print(p + ' %#7.2g' % rate)
             if src == 'otherEnd':
-                print '[' + en + ' from otherEnd traffic]',
+                print('[' + en + ' from otherEnd traffic]')
         else:
-            print ' '*9,
+            print(' '*9)
 
     n,l,p = e['nlp']
     if n in switchNameMap.keys():
         n = switchNameMap[n]
     if 'ignore' in e.keys() and e['ignore'] in ('lid', 'host'):  # this is a host that's been rebooted/down
-        print '( *** %5s, %4d, %2d)' % (n,l,p) , 'to',
+        print('( *** %5s, %4d, %2d)' % (n,l,p) , 'to')
     else:
-        print '(%10s, %4d, %2d)' % (n,l,p), 'to',
+        print('(%10s, %4d, %2d)' % (n,l,p), 'to')
 
     n,l,p = e['nlp-otherEnd']
     if n in switchNameMap.keys():
         n = switchNameMap[n]
     if 'nlp-otherEnd' in e.keys():
         if 'ignore' in e.keys() and e['ignore'] in ('port'): # otherEnd is rebooted/down host
-            print '( *** %5s, %4d, %2d)' % (n,l,p),
+            print('( *** %5s, %4d, %2d)' % (n,l,p))
         else:
-            print '(%10s, %4d, %2d)' % (n,l,p),
+            print('(%10s, %4d, %2d)' % (n,l,p))
     else:
-        print '<unknown in topology>',
+        print('<unknown in topology>')
 
     #print e['type'],
 
@@ -805,25 +805,25 @@ def printErrLine( e, tt ):
          rx = otx
          src = '(from other end)'
     if rx == None:
-         print 'no traffic info available',
+         print('no traffic info available')
     else:
          #print 'tx/rx %.1f %.1f GB' % ( tx/GB, rx/GB ),
          if rx < 0:
-             print 'negative %4.1f MB' % ( rx/MB ),
+             print('negative %4.1f MB' % ( rx/MB ))
          elif rx > 0.1*TB:
-             print 'rx %4.1f TB' % ( rx/TB ),
+             print('rx %4.1f TB' % ( rx/TB ))
          elif rx > 0.1*GB:
-             print 'rx %4.1f GB' % ( rx/GB ),
+             print('rx %4.1f GB' % ( rx/GB ))
          else:
-             print 'rx %4.1f MB' % ( rx/MB ),
+             print('rx %4.1f MB' % ( rx/MB ))
          if src != '':
-             print src,
+             print(src)
          if tx != None and orx != None and rx != None and otx != None:
              if tx > 0 and orx > 0 and rx > 0 and otx > 0:
                  absErr = math.sqrt((tx - orx)**2 + (rx - otx)**2)
                  relErr = absErr/(0.5*math.sqrt((tx + orx)**2 + (rx + otx)**2))
                  if absErr/MB > 100 and relErr > 0.1:
-                     print '(warning: orx/otx %.1f %.1f GB)' % ( orx/GB, otx/GB ),
+                     print('(warning: orx/otx %.1f %.1f GB)' % ( orx/GB, otx/GB ))
 
     tx, rx = errs[k]['p']
     otx, orx = errs[k]['p-otherEnd']
@@ -834,53 +834,53 @@ def printErrLine( e, tt ):
          rx = otx
          src = '(from other end)'
     if rx == None:
-         print 'no traffic info available',
+         print('no traffic info available')
     else:
          #print 'tx/rx %.1f %.1f MPkts' % ( tx/MB, rx/MB ),
          if rx < 0:
-             print 'negative %4.1f MPkts' % ( rx/MB ),
+             print('negative %4.1f MPkts' % ( rx/MB ))
          elif rx > 0.1*TB:
-             print '%4.1f TPkts' % ( rx/TB ),
+             print('%4.1f TPkts' % ( rx/TB ))
          elif rx > 0.1*GB:
-             print '%4.1f GPkts' % ( rx/GB ),
+             print('%4.1f GPkts' % ( rx/GB ))
          else:
-             print '%4.1f MPkts' % ( rx/MB ),
+             print('%4.1f MPkts' % ( rx/MB ))
          if src != '':
-             print src,
+             print(src)
          if tx != None and orx != None and rx != None and otx != None:
              if tx > 0 and orx > 0 and rx > 0 and otx > 0:
                  absErr = math.sqrt((tx - orx)**2 + (rx - otx)**2)
                  relErr = absErr/(0.5*math.sqrt((tx + orx)**2 + (rx + otx)**2))
                  if absErr/MB > 1 and relErr > 0.1:
-                     print '(warning: orx/otx %.1f %.1f MPkts)' % ( orx/MB, otx/MB ),
+                     print('(warning: orx/otx %.1f %.1f MPkts)' % ( orx/MB, otx/MB ))
 
     if 'errs' in e.keys():   # might not be if we're just reporting bad rates
-        print 'errs', e['errs'],
+        print('errs', e['errs'])
 
     if 'otherEndErrors' in e.keys():
-        print 'ALSO errs at other end',
+        print('ALSO errs at other end')
 
     if 'portRate' in e.keys():
         if e['portRate'] == 'unknown':
-            print '** ?x?DR **',
+            print('** ?x?DR **')
         else:
-            print '**', e['portRate'], '**',
+            print('**', e['portRate'], '**')
 
     #for errName, errCnt in e['errs']:
     #    if errName == 'SymbolErrors':
     #        print 'errs', errCnt,
 
-    print
+    print()
 
     return t
 
 def printErrDesc():
    l = 0
-   for e, d in errVerbose.iteritems():
+   for e, d in errVerbose.items():
       if len(e) > l:
           l = len(e)
-   for e, d in errVerbose.iteritems():
-      print ' '*(l - len(e)), e, '-',  d
+   for e, d in errVerbose.items():
+      print(' '*(l - len(e)), e, '-',  d)
 
 def setExpectedRates(keys, lph, switchTree):
     # loop over all keys for all ports and set expected rates
@@ -904,22 +904,22 @@ def setExpectedRates(keys, lph, switchTree):
     return expectedPortRate
 
 def usage():
-   print 'usage:', sys.argv[0], '[-h|--help] [-r|--rebooted] [-a|--allerrs] [-m M|--minerrs=M] [-L|--list] [-l|--low] [-E|--errdesc] [-t|--timedata] [-T r|--threshold=r] [N]'
-   print '  --rebooted   do not ignore rebooted hosts/lids'
-   print '  --allerrs    report all types of errors, not just', normalErrors
-   print '  --minerrs    do not generate BER/Rcv for SymbolErrors/RcvErrors counts of less than M. default', minErrCount
-   print '  --list       list possible sets of IB files that could be used, and then exit'
-   print '  --low        also output lids with low error count'
-   print '  --errdesc    print some descritions of IB errors'
-   print '  --timedata   toggle SymbolErrors by time or by rx data, default by',
+   print('usage:', sys.argv[0], '[-h|--help] [-r|--rebooted] [-a|--allerrs] [-m M|--minerrs=M] [-L|--list] [-l|--low] [-E|--errdesc] [-t|--timedata] [-T r|--threshold=r] [N]')
+   print('  --rebooted   do not ignore rebooted hosts/lids')
+   print('  --allerrs    report all types of errors, not just', normalErrors)
+   print('  --minerrs    do not generate BER/Rcv for SymbolErrors/RcvErrors counts of less than M. default', minErrCount)
+   print('  --list       list possible sets of IB files that could be used, and then exit')
+   print('  --low        also output lids with low error count')
+   print('  --errdesc    print some descritions of IB errors')
+   print('  --timedata   toggle SymbolErrors by time or by rx data, default by')
    if symErrsByTime:
-      print 'time'
+      print('time')
    else:
-      print 'rx data'
-   print '  --threshold  set threshold for SymbolErrorRate. default is IB spec of', ibSymErrThresh
-   print 'N is an optional integer that counts back in time through allowable sets of'
-   print 'IB files. if omitted the most recent set of files is used (same as N=1).'
-   print 'eg. N=2 specifies the second last set of files.'
+      print('rx data')
+   print('  --threshold  set threshold for SymbolErrorRate. default is IB spec of', ibSymErrThresh)
+   print('N is an optional integer that counts back in time through allowable sets of')
+   print('IB files. if omitted the most recent set of files is used (same as N=1).')
+   print('eg. N=2 specifies the second last set of files.')
    sys.exit(0)
 
 if __name__ == '__main__':
@@ -951,7 +951,7 @@ if __name__ == '__main__':
              try:
                  ibSymErrThresh = float(a)
                  ibRcvErrThresh = ibSymErrThresh
-             except:  
+             except:
                  usage()
          elif o in ('-l', '--low'):
              lowToo = 1
@@ -975,7 +975,7 @@ if __name__ == '__main__':
 
     groups, pairs = findGroupsOfFiles( ibDir )
     if len(pairs) == 0:
-        print 'no valid sets of ib error and stats files found. need to gather some stats first?'
+        print('no valid sets of ib error and stats files found. need to gather some stats first?')
         sys.exit(1)
 
     if listOnly:
@@ -985,43 +985,43 @@ if __name__ == '__main__':
             grp0 = groups[p0]
             grp1 = groups[p1]
             interval = grp1['perfstats'][0] - grp0['ibclearerrors'][0]
-            print cnt, 'interval', hms(interval), grp0['perfstats'][1].split('.')[0], 'to', grp1['perfstats'][1].split('.')[0]
+            print(cnt, 'interval', hms(interval), grp0['perfstats'][1].split('.')[0], 'to', grp1['perfstats'][1].split('.')[0])
             cnt += 1
         sys.exit(0)
 
     if allHosts:
-        print 'warning: rebooted/down hosts are included'
+        print('warning: rebooted/down hosts are included')
     else:
-        print 'only displaying non-rebooted/down hosts'
+        print('only displaying non-rebooted/down hosts')
 
     if allErrs:
-        print 'showing all errors, not just', normalErrors
+        print('showing all errors, not just', normalErrors)
     else:
-        print 'warning: only displaying', normalErrors
+        print('warning: only displaying', normalErrors)
 
     if lowToo:
-        print 'showing ports with low error counts'
+        print('showing ports with low error counts')
     else:
-        print 'only displaying ports with error counts >', minErrCount
+        print('only displaying ports with error counts >', minErrCount)
 
     if symErrsByTime:
-        print 'symbol err rate calculated by time and line rate, threshold', ibSymErrThresh
+        print('symbol err rate calculated by time and line rate, threshold', ibSymErrThresh)
     else:
-        print 'symbol err rate calculated by rx data, threshold', ibSymErrThresh
-    print 'rcv err rate calculated by rx data, threshold', ibRcvErrThresh
+        print('symbol err rate calculated by rx data, threshold', ibSymErrThresh)
+    print('rcv err rate calculated by rx data, threshold', ibRcvErrThresh)
 
     if pick >= len(pairs):
-        print 'sorry. there aren\'t that many sets of IB files. max', len(pairs), 'pick', pick
+        print('sorry. there aren\'t that many sets of IB files. max', len(pairs), 'pick', pick)
         sys.exit(1)
     elif pick < 0:
-        print 'IB file set number must be >0'
+        print('IB file set number must be >0')
         sys.exit(1)
 
     pair = p0, p1 = pairs[-pick]
     grp0 = groups[p0]
     grp1 = groups[p1]
     if debug:
-        print 'pick', pick, 'using', pair, 'grp0', grp0, 'grp1', grp1
+        print('pick', pick, 'using', pair, 'grp0', grp0, 'grp1', grp1)
 
     ibNetFile = grp1['ibnetdiscover'][1]
     switchTree, byName, lph, rates = parseIbnetdiscover( ibNetFile=ibNetFile )
@@ -1047,7 +1047,7 @@ if __name__ == '__main__':
             if len(i) > 0 and i[0] == '#':
                 continue
             ignore.append( i.strip() )
-        print 'rebooted in interval', ignore,
+        print('rebooted in interval', ignore)
     else:
         uptime, down = uptimes()
         #print 'len(uptime)', len(uptime), 'uptime', uptime   # uptimes by hostname
@@ -1063,18 +1063,18 @@ if __name__ == '__main__':
             # no idea about currently down nodes, so assume they are evil
             ignore.extend(down)
 
-            print 'warning: no rebooted file. using ganglia rebooted/down in last', hms(time.time() - fTime), ignore,
+            print('warning: no rebooted file. using ganglia rebooted/down in last', hms(time.time() - fTime), ignore)
 
     blah, ignoreLid = findHostLid( ignore )
-    print 'lids', ignoreLid
+    print('lids', ignoreLid)
 
     interval = grp1['perfstats'][0] - grp0['ibclearerrors'][0]
-    print 'errors in interval of', hms(interval), '(h:m:s)'
+    print('errors in interval of', hms(interval), '(h:m:s)')
 
     s = getTraffic( f0=grp0['perfstats'][1], f1=grp1['perfstats'][1] )
 
-    print 'tuples are (name, lid, port)'
-    print '* denotes above threshold, - denotes not enough errors, ** denotes incorrect link rate, *** denotes rebooted'
+    print('tuples are (name, lid, port)')
+    print('* denotes above threshold, - denotes not enough errors, ** denotes incorrect link rate, *** denotes rebooted')
 
     # find eg. SDR/DDR or 1x 2x links
     addRateErrs( switchTree, lph, rates, errs, expectedPortRate )
@@ -1103,7 +1103,7 @@ if __name__ == '__main__':
                 errs[k]['ignore'] = 'host'
             errs[k]['nlp'] = (host, lid, port)
             if host not in byName.keys():
-                print 'warning: no byName entry for host', host
+                print('warning: no byName entry for host', host)
                 continue
             swPort, swName, swLid = byName[host]
             errs[k]['nlp-otherEnd'] = (swName, swLid, swPort)
@@ -1195,7 +1195,7 @@ if __name__ == '__main__':
                 elif ot == 'FC':
                     tt = 'LC<->FC'
                 else:
-                    print 'LC connected to unknown - illegal link?',
+                    print('LC connected to unknown - illegal link?')
                     tt = None
                     exit(1)
         errs[k]['type'] = tt
@@ -1215,7 +1215,7 @@ if __name__ == '__main__':
             addAlwaysShowErrToErrs( errs, k, errorList )
 
     if debug:
-        print errs
+        print(errs)
 
     # sort by BitErrorRate
     ber = []
@@ -1245,9 +1245,9 @@ if __name__ == '__main__':
     missed = []
     covered = []
     for tt in topologyLevels:
-        print
-        print tt
-        print '    Sym       Rcv'
+        print()
+        print(tt)
+        print('    Sym       Rcv')
         for r, k in ber:
             t = printErrLine(errs[k], tt)
             if t in tt:
@@ -1267,4 +1267,4 @@ if __name__ == '__main__':
     #print 'covered', covered
     for m in missed:
         if m not in covered:
-            print 'error - missed type', m
+            print('error - missed type', m)

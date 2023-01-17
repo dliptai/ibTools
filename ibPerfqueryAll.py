@@ -11,7 +11,7 @@ import string
 import subprocess
 import socket
 import os
-import cPickle
+import pickle
 import getopt
 
 from ibTracePorts import parseIbnetdiscover
@@ -161,11 +161,11 @@ def parseToStats( s, r, lpn, start ):
 
 def dumpStats( s ):
    f = open( dumpFile, 'w+b' )
-   cPickle.dump( s, f )
+   pickle.dump( s, f )
    f.close()
 
 def usage():
-   print 'usage:', sys.argv[0], '[-h|--help] dumpFileName'
+   print('usage:', sys.argv[0], '[-h|--help] dumpFileName')
    sys.exit(1)
 
 def parseArgs():

@@ -192,7 +192,7 @@ def parseToStats( r, lp ):
             d.append( int(val) )
 
    return s
- 
+
 def computeRates( sOld, s ):
    rates = {}
    weirdCnt = 0
@@ -212,29 +212,29 @@ def computeRates( sOld, s ):
                r.append(dd)
          if r[0] > dataMax or r[0] < 0:
             if weirdCnt < weirdThresh:
-               print 'trapped weird txData', r[0], h
+               print('trapped weird txData', r[0], h)
             weirdCnt += 1
             r[0] = 0.0
          if r[1] > dataMax or r[1] < 0:
             if weirdCnt < weirdThresh:
-               print 'trapped weird rxData', r[1], h
+               print('trapped weird rxData', r[1], h)
             weirdCnt += 1
             r[1] = 0.0
          if r[2] > pktsMax or r[2] < 0:
             if weirdCnt < weirdThresh:
-               print 'trapped weird txPkts', r[2], h
+               print('trapped weird txPkts', r[2], h)
             weirdCnt += 1
             r[2] = 0.0
          if r[3] > pktsMax or r[3] < 0:
             if weirdCnt < weirdThresh:
-               print 'trapped weird rxPkts', r[3], h
+               print('trapped weird rxPkts', r[3], h)
             weirdCnt += 1
             r[3] = 0.0
 
          rates[h] = r
 
    if weirdCnt >= weirdThresh:
-      print 'trapped many weird pkts/data - cnt', weirdCnt
+      print('trapped many weird pkts/data - cnt', weirdCnt)
 
    return rates
 
@@ -330,7 +330,7 @@ if __name__ == '__main__':
 
    ip = getIp(host)
    if ip == None:
-      print 'cannot lookup', host
+      print('cannot lookup', host)
       sys.exit(1)
    spoofStr = ip + ':' + host
    #print 'spoofStr', spoofStr
@@ -366,7 +366,7 @@ if __name__ == '__main__':
 
          c = parseValsToGmetricLines(rate, t.lower(), spoofStr)
          if not len(c):
-            print 'error making gmetric lines', t
+            print('error making gmetric lines', t)
             continue
          #print 't', t, 'c', c
 

@@ -23,11 +23,11 @@ class config:
       # prefix
       s = ne.split('[')
       if len(s) > 2:
-         print 'format error in', ne
+         print('format error in', ne)
          sys.exit(1)
       pre = s[0]
       if len(pre) == 0:
-         print 'there is no node prefix. this is illegal', ne
+         print('there is no node prefix. this is illegal', ne)
          sys.exit(1)
       if len(s) == 1:  # there is no node range
          return [ pre ]
@@ -35,7 +35,7 @@ class config:
       # suffix
       s = ne.split(']')
       if len(s) != 2:
-         print 'too many ] in', ne
+         print('too many ] in', ne)
          sys.exit(1)
       suf = s[1]
 
@@ -105,4 +105,4 @@ class config:
 
 if __name__ == "__main__":
    c = config()
-   print 'c.mm', c.mm
+   print('c.mm', c.mm)
