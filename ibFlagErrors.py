@@ -19,9 +19,15 @@
 # should also read ibdiagnet to look for links the wrong speed, although this
 # into is also returned by netdiscover so use that instead.
 
-import os, sys, getopt, time, pickle, math
-from ibTracePorts import parseIbnetdiscover, findMostRecentFile, findMostRecentFiles
+import getopt
+import math
+import os
+import pickle
+import sys
+import time
+
 from hms import hms
+from ibTracePorts import findMostRecentFile, findMostRecentFiles, parseIbnetdiscover
 
 try:
     from pbsMauiGanglia import gangliaStats

@@ -17,20 +17,22 @@
 #  - pound that info into ganglia via gmetric spoofing
 #  - if it looks like new hosts have been added to the fabric, then re-run ibnetdiscover
 
-import sys
-import time
+import json
+import os
+import socket
 import string
 import subprocess
-import socket
-import os
-import json
-import urllib.request, urllib.error, urllib.parse
-
-# from pbsMauiGanglia import gangliaStats
-from ibTracePorts import parseIbnetdiscover
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
 # from bobMon import pbsJobs  # to find which jobs are on a flickering node
 import gmetric
+
+# from pbsMauiGanglia import gangliaStats
+from ibTracePorts import parseIbnetdiscover
 
 dir = "/root/ib/"
 perfCmd = dir + "perfqueryMany"

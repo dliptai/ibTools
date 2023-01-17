@@ -3,10 +3,12 @@
 # find and print nodes that have been rebooted since the last ibclearerrors
 # used by IB error checking scripts to eliminate nodes rebooted during that interval from error sweeps
 
-from ibTracePorts import findMostRecentFile
-from ibFlagErrors import uptimes, filterHosts
+import sys
+import time
+
 from hms import hms
-import time, sys
+from ibFlagErrors import filterHosts, uptimes
+from ibTracePorts import findMostRecentFile
 
 ibDir = "/root/ib"
 suffix = "ibclearerrors"

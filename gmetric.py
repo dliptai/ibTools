@@ -39,8 +39,9 @@
 #   Added Spoofing support
 
 
+import re
+import socket
 from xdrlib import Packer, Unpacker
-import socket, re
 
 slope_str2int = {"zero": 0, "positive": 1, "negative": 2, "both": 3, "unspecified": 4}
 

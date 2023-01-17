@@ -3,12 +3,13 @@
 # (c) Robin Humble 2003,2004,2005,2006,2007,2008
 # licensed under the GPL v3
 
-import os
-import sys
-import string
-import time
-import pwd, grp
 import copy
+import grp
+import os
+import pwd
+import string
+import sys
+import time
 from xml.dom import minidom
 
 # import pyslurm

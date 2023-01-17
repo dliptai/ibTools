@@ -15,14 +15,15 @@
 #  - pound that info into ganglia via gmetric spoofing
 #  - every so often check for a new ibnetdiscover
 
+import socket
+import subprocess
 import sys
 import time
-import subprocess
-import socket
+
+from compact import compressList
+from ibCheckTopology import findLidsByType
 
 from ibTracePorts import parseIbnetdiscover
-from ibCheckTopology import findLidsByType
-from compact import compressList
 
 # sleep this many seconds between samples
 sleepTime = 15

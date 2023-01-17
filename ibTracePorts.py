@@ -8,9 +8,9 @@
 #  - slurp up a designated ibnetdiscover output to figure out
 #    which switch ports are connected to HCA's
 
-import sys
-import socket
 import os
+import socket
+import sys
 
 ibDirDefault = "/root/ib"
 startHost = "xepbs"
